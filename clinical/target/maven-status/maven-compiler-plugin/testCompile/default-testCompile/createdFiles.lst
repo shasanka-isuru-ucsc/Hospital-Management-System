@@ -1,0 +1,6 @@
+com/hms/clinical/controller/ClinicalApiIntegrationTest.class
+com/hms/clinical/service/VitalsServiceTest.class
+com/hms/clinical/service/PrescriptionServiceTest.class
+com/hms/clinical/service/SessionServiceTest.class
+com/hms/clinical/service/LabRequestServiceTest.class
+com/hms/clinical/ClinicalApplicationTests.class

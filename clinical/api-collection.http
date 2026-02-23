@@ -1,0 +1,159 @@
+### Clinical Service API Collection
+### Base URL: http://localhost:3002
+
+### ─── SESSIONS ───
+
+### Create a new clinical session
+POST http://localhost:3002/sessions
+Content-Type: application/json
+X-User-Id: 00000000-0000-0000-0000-000000000001
+X-User-Name: Dr. Jenny Smith
+
+{
+  "patientId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "sessionType": "opd",
+  "chiefComplaint": "Persistent fever for 3 days"
+}
+
+###
+
+### List sessions
+GET http://localhost:3002/sessions?page=1&limit=20
+
+###
+
+### Get session by ID
+GET http://localhost:3002/sessions/{{sessionId}}
+
+###
+
+### Update session
+PUT http://localhost:3002/sessions/{{sessionId}}
+Content-Type: application/json
+
+{
+  "chiefComplaint": "Updated complaint",
+  "diagnosis": "Suspected Typhoid"
+}
+
+###
+
+### Complete session
+PUT http://localhost:3002/sessions/{{sessionId}}/complete
+Content-Type: application/json
+
+{
+  "diagnosis": "Typhoid Fever — Widal test positive",
+  "discountPercent": 0
+}
+
+### ─── VITALS ───
+
+### Record vitals
+POST http://localhost:3002/sessions/{{sessionId}}/vitals
+Content-Type: application/json
+
+{
+  "bpm": 80,
+  "temperature": 37.8,
+  "bloodPressureSys": 120,
+  "bloodPressureDia": 80,
+  "spo2": 98,
+  "weightKg": 68.5,
+  "heightCm": 170
+}
+
+###
+
+### Get vitals
+GET http://localhost:3002/sessions/{{sessionId}}/vitals
+
+###
+
+### Get vitals history for patient
+GET http://localhost:3002/patients/{{patientId}}/vitals-history
+
+### ─── PRESCRIPTIONS ───
+
+### Add prescriptions
+POST http://localhost:3002/sessions/{{sessionId}}/prescriptions
+Content-Type: application/json
+
+{
+  "prescriptions": [
+    {
+      "type": "internal",
+      "medicineName": "Paracetamol",
+      "dosage": "500mg",
+      "frequency": "Every 8 hours",
+      "durationDays": 5,
+      "instructions": "Take with water after meals"
+    },
+    {
+      "type": "external",
+      "medicineName": "Amoxicillin",
+      "dosage": "500mg",
+      "frequency": "Three times daily",
+      "durationDays": 7,
+      "pharmacyName": "Narammala Pharmacy"
+    }
+  ]
+}
+
+###
+
+### Get session prescriptions
+GET http://localhost:3002/sessions/{{sessionId}}/prescriptions
+
+###
+
+### Get session prescriptions by type
+GET http://localhost:3002/sessions/{{sessionId}}/prescriptions?type=internal
+
+### ─── PHARMACY ───
+
+### Get pharmacy queue
+GET http://localhost:3002/pharmacy/queue
+
+###
+
+### Dispense prescription
+PUT http://localhost:3002/pharmacy/{{rxId}}/dispense
+
+### ─── LAB REQUESTS ───
+
+### Request lab tests
+POST http://localhost:3002/sessions/{{sessionId}}/lab-requests
+Content-Type: application/json
+
+{
+  "tests": [
+    { "testId": "00000000-0000-0000-0000-000000000001", "urgency": "routine" },
+    { "testId": "00000000-0000-0000-0000-000000000002", "urgency": "urgent" }
+  ],
+  "notes": "Patient has fever for 3 days — suspect typhoid"
+}
+
+###
+
+### Get lab requests
+GET http://localhost:3002/sessions/{{sessionId}}/lab-requests
+
+### ─── PATIENT HISTORY ───
+
+### Get patient clinical history
+GET http://localhost:3002/patients/{{patientId}}/history?page=1&limit=20
+
+### ─── IMAGES ───
+
+### Upload image (multipart)
+# Use Postman or cURL:
+# curl -X POST http://localhost:3002/sessions/{{sessionId}}/images \
+#   -F "image=@path/to/image.jpg" \
+#   -F "caption=Left knee X-ray" \
+#   -F "imageType=scan"
+
+###
+
+### Get session images
+GET http://localhost:3002/sessions/{{sessionId}}/images
