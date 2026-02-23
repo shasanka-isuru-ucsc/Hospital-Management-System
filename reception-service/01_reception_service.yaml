@@ -1,0 +1,954 @@
+openapi: 3.0.3
+info:
+  title: HMS — Reception Service
+  description: |
+    Manages patient registration, queue token issuance, and appointment booking.
+
+    **Auth:** All endpoints require a valid Keycloak JWT in the `Authorization: Bearer <token>` header.
+    The API Gateway validates the token and injects `X-User-Id` and `X-User-Role` headers.
+
+    **Base URL (via gateway):** `http://localhost:3000/reception`
+    **Direct URL:** `http://localhost:3001`
+  version: 1.0.0
+  contact:
+    name: HMS MSc Project
+
+servers:
+  - url: http://localhost:3000/reception
+    description: Via API Gateway (use this)
+  - url: http://localhost:3001
+    description: Direct (internal only)
+
+tags:
+  - name: Patients
+    description: Patient registration and management
+  - name: Tokens
+    description: Queue token issuance and status management
+  - name: Queue
+    description: Live queue state for display boards
+  - name: Appointments
+    description: Doctor appointment booking
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Patient:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        patientNumber:
+          type: string
+          example: "R00001"
+        firstName:
+          type: string
+          example: "Andrea"
+        lastName:
+          type: string
+          example: "Lalema"
+        mobile:
+          type: string
+          example: "+94771234567"
+        email:
+          type: string
+          format: email
+          example: "andrea@example.com"
+        dateOfBirth:
+          type: string
+          format: date
+          example: "1995-03-15"
+        gender:
+          type: string
+          enum: [male, female, other]
+        address:
+          type: string
+          example: "123 Main Street, Colombo"
+        bloodGroup:
+          type: string
+          enum: ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
+        avatarUrl:
+          type: string
+          description: Pre-signed MinIO URL (15-min TTL)
+          example: "http://localhost:9000/hms-avatars/patient-uuid.jpg?X-Amz-..."
+        triage:
+          type: string
+          enum: [non_urgent, emergency, out_patient, urgent]
+        status:
+          type: string
+          enum: [active, inactive]
+        createdAt:
+          type: string
+          format: date-time
+
+    PatientCreate:
+      type: object
+      required: [firstName, lastName, mobile, dateOfBirth, gender]
+      properties:
+        firstName:
+          type: string
+          example: "Andrea"
+        lastName:
+          type: string
+          example: "Lalema"
+        mobile:
+          type: string
+          example: "+94771234567"
+          description: Must be unique across all patients
+        email:
+          type: string
+          format: email
+        dateOfBirth:
+          type: string
+          format: date
+          example: "1995-03-15"
+        gender:
+          type: string
+          enum: [male, female, other]
+        address:
+          type: string
+        bloodGroup:
+          type: string
+          enum: ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
+        triage:
+          type: string
+          enum: [non_urgent, emergency, out_patient, urgent]
+
+    Token:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tokenNumber:
+          type: integer
+          example: 7
+        patientId:
+          type: string
+          format: uuid
+        patientName:
+          type: string
+          example: "Andrea Lalema"
+        queueType:
+          type: string
+          enum: [opd, wound_care, doctor_consultation]
+        doctorId:
+          type: string
+          format: uuid
+          nullable: true
+        doctorName:
+          type: string
+          nullable: true
+          example: "Dr. Jenny Smith"
+        status:
+          type: string
+          enum: [waiting, called, in_progress, completed, skipped, cancelled]
+        sessionDate:
+          type: string
+          format: date
+        issuedAt:
+          type: string
+          format: date-time
+        calledAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        queuePosition:
+          type: integer
+          description: Current position in the waiting queue
+          example: 3
+
+    TokenCreate:
+      type: object
+      required: [patientId, queueType]
+      properties:
+        patientId:
+          type: string
+          format: uuid
+        queueType:
+          type: string
+          enum: [opd, wound_care, doctor_consultation]
+        doctorId:
+          type: string
+          format: uuid
+          description: Required when queueType is doctor_consultation
+
+    TokenStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [waiting, called, in_progress, completed, skipped, cancelled]
+
+    Appointment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+          nullable: true
+        patientName:
+          type: string
+          example: "Andrea Lalema"
+        patientMobile:
+          type: string
+          example: "+94771234567"
+        gender:
+          type: string
+          enum: [male, female, other]
+        address:
+          type: string
+        doctorId:
+          type: string
+          format: uuid
+        doctorName:
+          type: string
+          example: "Dr. Jenny Smith"
+        appointmentDate:
+          type: string
+          format: date
+        fromTime:
+          type: string
+          example: "09:00"
+        toTime:
+          type: string
+          example: "09:15"
+        treatment:
+          type: string
+          example: "Typhoid Fever"
+        status:
+          type: string
+          enum: [scheduled, ongoing, completed, cancelled, rescheduled]
+        notes:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+        bookedBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+
+    AppointmentCreate:
+      type: object
+      required: [doctorId, appointmentDate, fromTime, toTime]
+      properties:
+        patientId:
+          type: string
+          format: uuid
+          description: Use this if patient is already registered
+        patientName:
+          type: string
+          description: Required if patientId is null (walk-in)
+        patientMobile:
+          type: string
+          description: Required if patientId is null
+        gender:
+          type: string
+          enum: [male, female, other]
+        address:
+          type: string
+        doctorId:
+          type: string
+          format: uuid
+        appointmentDate:
+          type: string
+          format: date
+        fromTime:
+          type: string
+          example: "09:00"
+        toTime:
+          type: string
+          example: "09:15"
+        treatment:
+          type: string
+        notes:
+          type: string
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 143
+        totalPages:
+          type: integer
+          example: 8
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "PATIENT_NOT_FOUND"
+            message:
+              type: string
+              example: "No patient with id abc-123"
+            statusCode:
+              type: integer
+              example: 404
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ─── PATIENTS ───────────────────────────────────────────────
+
+  /patients:
+    get:
+      tags: [Patients]
+      summary: List all patients
+      description: Paginated list of all registered patients. Supports name/mobile search.
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by name or mobile number
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Paginated patient list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Patient"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - bearerAuth: []
+
+    post:
+      tags: [Patients]
+      summary: Register a new patient
+      description: |
+        Creates a new patient record. The patient_number is auto-generated (R00001, R00002…).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatientCreate"
+      responses:
+        "201":
+          description: Patient registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Patient"
+        "409":
+          description: Mobile number already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                error:
+                  code: "DUPLICATE_MOBILE"
+                  message: "A patient with mobile +94771234567 is already registered"
+                  statusCode: 409
+      security:
+        - bearerAuth: []
+
+  /patients/search:
+    get:
+      tags: [Patients]
+      summary: Search patients by name or mobile
+      description: Lightweight search used for autocomplete in appointment booking and token issuance. Returns basic info only.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+          description: Search term — matches against firstName, lastName, or mobile
+          example: "Andrea"
+      responses:
+        "200":
+          description: Matching patients
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        patientNumber:
+                          type: string
+                        fullName:
+                          type: string
+                        mobile:
+                          type: string
+                        dateOfBirth:
+                          type: string
+                          format: date
+                        gender:
+                          type: string
+      security:
+        - bearerAuth: []
+
+  /patients/{id}:
+    get:
+      tags: [Patients]
+      summary: Get patient by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Patient record
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Patient"
+        "404":
+          description: Patient not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - bearerAuth: []
+
+    put:
+      tags: [Patients]
+      summary: Update patient details
+      description: Receptionist can update patient contact details, address, triage etc.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                mobile:
+                  type: string
+                email:
+                  type: string
+                address:
+                  type: string
+                bloodGroup:
+                  type: string
+                triage:
+                  type: string
+                  enum: [non_urgent, emergency, out_patient, urgent]
+                status:
+                  type: string
+                  enum: [active, inactive]
+      responses:
+        "200":
+          description: Patient updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Patient"
+        "404":
+          description: Patient not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - bearerAuth: []
+
+  # ─── TOKENS ─────────────────────────────────────────────────
+
+  /tokens:
+    post:
+      tags: [Tokens]
+      summary: Issue a queue token
+      description: |
+        Issues a queue token for a patient. Token numbers reset daily per queue type.
+        On creation, publishes a `queue.updated` event to RabbitMQ, which the API Gateway
+        bridges to connected Queue Display boards via WebSocket.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenCreate"
+            example:
+              patientId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+              queueType: "opd"
+      responses:
+        "201":
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Token"
+              example:
+                success: true
+                data:
+                  id: "uuid"
+                  tokenNumber: 7
+                  patientName: "Andrea Lalema"
+                  queueType: "opd"
+                  status: "waiting"
+                  queuePosition: 3
+        "422":
+          description: Patient already has an active token for this queue today
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - bearerAuth: []
+
+  /tokens/today:
+    get:
+      tags: [Tokens]
+      summary: All tokens issued today
+      description: Returns all tokens for today across all queue types with current status.
+      parameters:
+        - name: queueType
+          in: query
+          schema:
+            type: string
+            enum: [opd, wound_care, doctor_consultation]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [waiting, called, in_progress, completed, skipped, cancelled]
+      responses:
+        "200":
+          description: Today's tokens
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Token"
+      security:
+        - bearerAuth: []
+
+  /tokens/{id}/status:
+    put:
+      tags: [Tokens]
+      summary: Update token status
+      description: |
+        Updates the token status. This is the primary action for the queue workflow:
+        - Receptionist calls patient: waiting → called
+        - Doctor starts: called → in_progress  
+        - Doctor finishes: in_progress → completed
+
+        Every status change publishes a `queue.updated` RabbitMQ fanout event,
+        which instantly refreshes all Queue Display boards via WebSocket.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenStatusUpdate"
+            example:
+              status: "called"
+      responses:
+        "200":
+          description: Token status updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Token"
+        "404":
+          description: Token not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - bearerAuth: []
+
+  # ─── QUEUE ──────────────────────────────────────────────────
+
+  /queue/{type}:
+    get:
+      tags: [Queue]
+      summary: Get live queue for a type
+      description: |
+        Returns all active tokens for the given queue type today, sorted by tokenNumber.
+        Used by the Queue Display board (polls or receives via WebSocket push).
+        Doctor sees only their own queue when queueType = doctor_consultation.
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [opd, wound_care, doctor_consultation]
+        - name: doctorId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by doctor (for doctor_consultation queue)
+      responses:
+        "200":
+          description: Current queue state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      queueType:
+                        type: string
+                        example: "opd"
+                      date:
+                        type: string
+                        format: date
+                      currentlyServing:
+                        $ref: "#/components/schemas/Token"
+                        nullable: true
+                      waiting:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Token"
+                      completedCount:
+                        type: integer
+                        example: 12
+      security:
+        - bearerAuth: []
+
+  # ─── APPOINTMENTS ────────────────────────────────────────────
+
+  /appointments:
+    get:
+      tags: [Appointments]
+      summary: List appointments
+      description: |
+        Returns appointments with optional filters. 
+        - Admin/Receptionist: sees all appointments
+        - Doctor: sees only their own appointments (filtered server-side by X-User-Id)
+      parameters:
+        - name: doctorId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2026-02-21"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [scheduled, ongoing, completed, cancelled, rescheduled]
+        - name: patientId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Appointment list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Appointment"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+      security:
+        - bearerAuth: []
+
+    post:
+      tags: [Appointments]
+      summary: Book an appointment
+      description: |
+        Book a new appointment. Validates that the doctor has an available slot at the given time.
+        If patient_id is provided and patient is found, their details auto-fill.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppointmentCreate"
+      responses:
+        "201":
+          description: Appointment booked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Appointment"
+        "422":
+          description: Slot not available or doctor unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                success: false
+                error:
+                  code: "SLOT_NOT_AVAILABLE"
+                  message: "Dr. Jenny Smith has no available slot at 09:00 on 2026-02-21"
+                  statusCode: 422
+      security:
+        - bearerAuth: []
+
+  /appointments/{id}:
+    get:
+      tags: [Appointments]
+      summary: Get appointment by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Appointment detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Appointment"
+        "404":
+          description: Appointment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - bearerAuth: []
+
+    put:
+      tags: [Appointments]
+      summary: Update / reschedule appointment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                doctorId:
+                  type: string
+                  format: uuid
+                appointmentDate:
+                  type: string
+                  format: date
+                fromTime:
+                  type: string
+                toTime:
+                  type: string
+                treatment:
+                  type: string
+                notes:
+                  type: string
+                status:
+                  type: string
+                  enum: [scheduled, rescheduled, cancelled]
+      responses:
+        "200":
+          description: Appointment updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Appointment"
+        "404":
+          description: Appointment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - bearerAuth: []
+
+    delete:
+      tags: [Appointments]
+      summary: Cancel appointment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Appointment cancelled
+        "404":
+          description: Appointment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - bearerAuth: []

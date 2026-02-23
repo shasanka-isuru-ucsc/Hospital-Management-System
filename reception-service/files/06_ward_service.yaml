@@ -1,0 +1,965 @@
+openapi: 3.0.3
+info:
+  title: HMS — Ward Service
+  description: |
+    Manages the admission ward: bed availability, patient admissions, daily service/charge
+    stacking, and patient discharge with automatic billing.
+    
+    On discharge, publishes a `billing.ward` event to RabbitMQ. Finance Service picks this
+    up and closes the ward admission invoice automatically.
+    
+    **Auth:** Keycloak JWT required.
+    
+    **Base URL (via gateway):** `http://localhost:3000/ward`
+    **Direct URL:** `http://localhost:3006`
+    
+    **RabbitMQ events published:**
+    - `billing.ward` → on `PUT /admissions/:id/discharge` → Finance Service creates ward invoice
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000/ward
+    description: Via API Gateway
+  - url: http://localhost:3006
+    description: Direct (internal)
+
+tags:
+  - name: Wards
+    description: Ward and bed management
+  - name: Admissions
+    description: Patient admission lifecycle
+  - name: Services
+    description: Ward service charge stacking during admission
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Ward:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Male General Ward"
+        type:
+          type: string
+          enum: [general, icu, private, semi_private]
+        capacity:
+          type: integer
+          example: 20
+        occupied:
+          type: integer
+          example: 14
+        available:
+          type: integer
+          example: 6
+        maintenance:
+          type: integer
+          example: 0
+          description: Beds currently under maintenance
+        is_active:
+          type: boolean
+
+    WardCreate:
+      type: object
+      required: [name, type, capacity]
+      properties:
+        name:
+          type: string
+          example: "Female General Ward"
+        type:
+          type: string
+          enum: [general, icu, private, semi_private]
+        capacity:
+          type: integer
+          example: 15
+
+    Bed:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ward_id:
+          type: string
+          format: uuid
+        ward_name:
+          type: string
+          example: "Male General Ward"
+        bed_number:
+          type: string
+          example: "B-101"
+        status:
+          type: string
+          enum: [available, occupied, maintenance, reserved]
+        current_admission_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set when bed is occupied
+        current_patient_name:
+          type: string
+          nullable: true
+          description: Denormalized for quick display
+
+    WardService:
+      type: object
+      description: A single charge/service added to an admission
+      properties:
+        id:
+          type: string
+          format: uuid
+        admission_id:
+          type: string
+          format: uuid
+        service_name:
+          type: string
+          example: "IV Amoxicillin 500mg"
+        service_type:
+          type: string
+          enum: [medication, procedure, bed_charge, investigation, meal, other]
+        quantity:
+          type: integer
+          example: 2
+        unit_price:
+          type: number
+          format: float
+          example: 350.00
+        total_price:
+          type: number
+          format: float
+          example: 700.00
+        provided_at:
+          type: string
+          format: date-time
+        added_by:
+          type: string
+          description: Staff member who added the charge
+
+    WardServiceCreate:
+      type: object
+      required: [service_name, service_type, quantity, unit_price]
+      properties:
+        service_name:
+          type: string
+          example: "Daily Bed Charge"
+        service_type:
+          type: string
+          enum: [medication, procedure, bed_charge, investigation, meal, other]
+        quantity:
+          type: integer
+          minimum: 1
+          example: 1
+        unit_price:
+          type: number
+          format: float
+          example: 2500.00
+        notes:
+          type: string
+        provided_at:
+          type: string
+          format: date-time
+          description: Defaults to current timestamp if not provided
+
+    Admission:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        patient_id:
+          type: string
+          format: uuid
+        patient_name:
+          type: string
+          example: "Andrea Lalema"
+        patient_number:
+          type: string
+          example: "R00001"
+        bed_id:
+          type: string
+          format: uuid
+        bed_number:
+          type: string
+          example: "B-101"
+        ward_id:
+          type: string
+          format: uuid
+        ward_name:
+          type: string
+          example: "Male General Ward"
+        attending_doctor_id:
+          type: string
+          format: uuid
+        attending_doctor_name:
+          type: string
+          example: "Dr. Jenny Smith"
+        admission_reason:
+          type: string
+          example: "Post-operative recovery after appendectomy"
+        notes:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [admitted, discharged]
+        admitted_at:
+          type: string
+          format: date-time
+        discharged_at:
+          type: string
+          format: date-time
+          nullable: true
+        discharge_notes:
+          type: string
+          nullable: true
+        discharge_diagnosis:
+          type: string
+          nullable: true
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/WardService'
+        running_total:
+          type: number
+          format: float
+          description: Sum of all service charges so far
+          example: 12750.00
+        days_admitted:
+          type: integer
+          description: Number of days since admission
+          example: 3
+
+    AdmissionCreate:
+      type: object
+      required: [patient_id, bed_id, attending_doctor_id, admission_reason]
+      properties:
+        patient_id:
+          type: string
+          format: uuid
+        bed_id:
+          type: string
+          format: uuid
+          description: Must be an available bed
+        attending_doctor_id:
+          type: string
+          format: uuid
+        admission_reason:
+          type: string
+          example: "Typhoid fever — requiring IV treatment"
+        notes:
+          type: string
+
+    DischargeRequest:
+      type: object
+      properties:
+        discharge_notes:
+          type: string
+          example: "Patient recovered well. Discharge with oral antibiotics."
+        discharge_diagnosis:
+          type: string
+          example: "Typhoid Fever — resolved with IV Ceftriaxone"
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            statusCode:
+              type: integer
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  # ─── WARDS ───────────────────────────────────────────────────
+
+  /wards:
+    get:
+      tags: [Wards]
+      summary: List all wards with occupancy
+      description: Returns all wards with real-time bed availability counts. Used in the Admin Dashboard ward overview.
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [general, icu, private, semi_private]
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: Ward list with occupancy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Ward'
+              example:
+                success: true
+                data:
+                  - id: "uuid-ward-1"
+                    name: "Male General Ward"
+                    type: "general"
+                    capacity: 20
+                    occupied: 14
+                    available: 6
+                    maintenance: 0
+                  - id: "uuid-ward-2"
+                    name: "ICU"
+                    type: "icu"
+                    capacity: 6
+                    occupied: 4
+                    available: 2
+                    maintenance: 0
+      security:
+        - bearerAuth: []
+
+    post:
+      tags: [Wards]
+      summary: Create a new ward
+      description: Admin only. Creates ward and auto-generates beds based on capacity.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WardCreate'
+            example:
+              name: "Female General Ward"
+              type: "general"
+              capacity: 15
+      responses:
+        "201":
+          description: Ward created with beds
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Ward'
+                  message:
+                    type: string
+                    example: "Ward created with 15 beds (F-101 to F-115)"
+      security:
+        - bearerAuth: []
+
+  # ─── BEDS ────────────────────────────────────────────────────
+
+  /beds:
+    get:
+      tags: [Wards]
+      summary: List beds
+      description: Returns beds with current status. Filter by ward or status to find available beds.
+      parameters:
+        - name: ward_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [available, occupied, maintenance, reserved]
+      responses:
+        "200":
+          description: Bed list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Bed'
+              example:
+                success: true
+                data:
+                  - id: "uuid-bed-1"
+                    ward_name: "Male General Ward"
+                    bed_number: "B-101"
+                    status: "available"
+                    current_admission_id: null
+                  - id: "uuid-bed-2"
+                    ward_name: "Male General Ward"
+                    bed_number: "B-102"
+                    status: "occupied"
+                    current_patient_name: "John Doe"
+      security:
+        - bearerAuth: []
+
+  /beds/{id}:
+    put:
+      tags: [Wards]
+      summary: Update bed status
+      description: Admin can manually change bed status (e.g., set to maintenance).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [available, maintenance, reserved]
+                  description: Cannot set to 'occupied' manually — this happens via admissions
+                notes:
+                  type: string
+                  example: "Bed frame broken — awaiting repair"
+      responses:
+        "200":
+          description: Bed updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Bed'
+        "422":
+          description: Cannot change status of an occupied bed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+  # ─── ADMISSIONS ──────────────────────────────────────────────
+
+  /admissions:
+    post:
+      tags: [Admissions]
+      summary: Admit a patient
+      description: |
+        Admits a patient and assigns them to a specific bed.
+        The bed status changes to `occupied` immediately.
+        Cannot admit a patient if they already have an active admission.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdmissionCreate'
+            example:
+              patient_id: "uuid-patient"
+              bed_id: "uuid-bed-101"
+              attending_doctor_id: "uuid-doctor"
+              admission_reason: "High fever with suspected typhoid — IV treatment required"
+              notes: "Allergic to Penicillin"
+      responses:
+        "201":
+          description: Patient admitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Admission'
+        "422":
+          description: Bed not available or patient already admitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                bed_occupied:
+                  summary: Bed not available
+                  value:
+                    success: false
+                    error:
+                      code: "BED_NOT_AVAILABLE"
+                      message: "Bed B-101 is currently occupied"
+                      statusCode: 422
+                already_admitted:
+                  summary: Patient already admitted
+                  value:
+                    success: false
+                    error:
+                      code: "PATIENT_ALREADY_ADMITTED"
+                      message: "This patient already has an active admission"
+                      statusCode: 422
+      security:
+        - bearerAuth: []
+
+    get:
+      tags: [Admissions]
+      summary: List admissions
+      description: Paginated list of admissions. Supports filtering by ward, status, and date range.
+      parameters:
+        - name: ward_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [admitted, discharged]
+        - name: attending_doctor_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Admission list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Admission'
+                  meta:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                      limit:
+                        type: integer
+                      total:
+                        type: integer
+      security:
+        - bearerAuth: []
+
+  /admissions/{id}:
+    get:
+      tags: [Admissions]
+      summary: Get admission by ID
+      description: Full admission detail including all services and running total.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Admission detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Admission'
+        "404":
+          description: Admission not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+  /admissions/{id}/discharge:
+    put:
+      tags: [Admissions]
+      summary: Discharge patient
+      description: |
+        Discharges a patient from the ward. This triggers the following:
+        
+        1. Admission status set to `discharged`, `discharged_at` set to now
+        2. Bed status set back to `available`
+        3. All ward services fetched and total computed
+        4. `billing.ward` event published to RabbitMQ:
+        
+        ```json
+        {
+          "admission_id": "uuid",
+          "patient_id": "uuid",
+          "patient_name": "Andrea Lalema",
+          "ward_name": "Male General Ward",
+          "bed_number": "B-101",
+          "admitted_at": "2026-02-18T08:00:00Z",
+          "discharged_at": "2026-02-21T10:00:00Z",
+          "services": [...],
+          "total_amount": 12750.00
+        }
+        ```
+        
+        Finance Service receives this and creates/closes the ward admission invoice.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DischargeRequest'
+            example:
+              discharge_notes: "Patient recovered well. Discharge with oral antibiotics x 7 days."
+              discharge_diagnosis: "Typhoid Fever — resolved with IV Ceftriaxone"
+      responses:
+        "200":
+          description: Patient discharged and billing event published
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Admission'
+                  message:
+                    type: string
+                    example: "Patient discharged. Ward invoice will be created automatically."
+                  final_total:
+                    type: number
+                    format: float
+                    example: 12750.00
+        "404":
+          description: Admission not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "422":
+          description: Patient is already discharged
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+  /patients/{patientId}/admissions:
+    get:
+      tags: [Admissions]
+      summary: Get patient admission history
+      description: All ward admissions for a patient including discharge summaries.
+      parameters:
+        - name: patientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Patient admission history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Admission'
+                  meta:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                      total:
+                        type: integer
+      security:
+        - bearerAuth: []
+
+  # ─── SERVICES (charge stack) ──────────────────────────────────
+
+  /admissions/{id}/services:
+    post:
+      tags: [Services]
+      summary: Add a service charge to admission
+      description: |
+        Ward staff add charges to the admission billing stack throughout the patient's stay.
+        Common entries: daily bed charge, medications, procedures, investigations, meals.
+        
+        These accumulate and are all included in the `billing.ward` event payload on discharge.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WardServiceCreate'
+            examples:
+              bed_charge:
+                summary: Daily bed charge
+                value:
+                  service_name: "Daily Bed Charge"
+                  service_type: "bed_charge"
+                  quantity: 1
+                  unit_price: 2500.00
+              medication:
+                summary: Medication
+                value:
+                  service_name: "IV Ceftriaxone 1g"
+                  service_type: "medication"
+                  quantity: 2
+                  unit_price: 450.00
+                  notes: "Twice daily x 5 days"
+              procedure:
+                summary: Procedure
+                value:
+                  service_name: "Wound dressing"
+                  service_type: "procedure"
+                  quantity: 1
+                  unit_price: 800.00
+      responses:
+        "201":
+          description: Service charge added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/WardService'
+                  running_total:
+                    type: number
+                    format: float
+                    description: Updated running total for this admission
+                    example: 13550.00
+        "404":
+          description: Admission not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "422":
+          description: Cannot add services to a discharged admission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+    get:
+      tags: [Services]
+      summary: Get all services for an admission
+      description: Returns the full service charge stack with running total. Used at the bedside and billing counter.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: service_type
+          in: query
+          schema:
+            type: string
+            enum: [medication, procedure, bed_charge, investigation, meal, other]
+      responses:
+        "200":
+          description: Service list with running total
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      admission_id:
+                        type: string
+                        format: uuid
+                      patient_name:
+                        type: string
+                      admitted_at:
+                        type: string
+                        format: date-time
+                      days_admitted:
+                        type: integer
+                      services:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/WardService'
+                      running_total:
+                        type: number
+                        format: float
+                        example: 12750.00
+              example:
+                success: true
+                data:
+                  patient_name: "Andrea Lalema"
+                  days_admitted: 3
+                  services:
+                    - service_name: "Daily Bed Charge"
+                      service_type: "bed_charge"
+                      quantity: 3
+                      unit_price: 2500.00
+                      total_price: 7500.00
+                    - service_name: "IV Ceftriaxone 1g"
+                      service_type: "medication"
+                      quantity: 6
+                      unit_price: 450.00
+                      total_price: 2700.00
+                    - service_name: "Blood Transfusion"
+                      service_type: "procedure"
+                      quantity: 1
+                      unit_price: 2550.00
+                      total_price: 2550.00
+                  running_total: 12750.00
+      security:
+        - bearerAuth: []
+
+  /admissions/{id}/services/{serviceId}:
+    delete:
+      tags: [Services]
+      summary: Remove a service charge
+      description: |
+        Remove an incorrectly added service charge.
+        Only allowed while the admission is still active (not discharged).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Service charge removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Service removed. Updated running total: LKR 10,200.00"
+                  running_total:
+                    type: number
+                    format: float
+        "404":
+          description: Service charge not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "422":
+          description: Cannot remove services from discharged admission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []

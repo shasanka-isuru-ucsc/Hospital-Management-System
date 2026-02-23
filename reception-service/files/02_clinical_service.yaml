@@ -1,0 +1,1222 @@
+openapi: 3.0.3
+info:
+  title: HMS — Clinical Service
+  description: |
+    Manages clinical sessions (OPD, wound care, channelling), vitals recording, diagnoses,
+    prescriptions, scan image uploads, and lab test requests.
+    
+    **Auth:** Keycloak JWT required. Gateway injects `X-User-Id` and `X-User-Role`.
+    
+    **Base URL (via gateway):** `http://localhost:3000/clinical`
+    **Direct URL:** `http://localhost:3002`
+    
+    **RabbitMQ events published by this service:**
+    - `billing.events` → `billing.opd` when OPD session completed
+    - `billing.events` → `billing.wound` when wound care session completed
+    - `lab.events` → `lab.requested` when doctor requests lab tests
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000/clinical
+    description: Via API Gateway
+  - url: http://localhost:3002
+    description: Direct (internal)
+
+tags:
+  - name: Sessions
+    description: Clinical visit sessions
+  - name: Vitals
+    description: Patient vitals recording
+  - name: Diagnosis
+    description: Diagnosis text and image uploads
+  - name: Prescriptions
+    description: Internal and external prescriptions
+  - name: Lab Requests
+    description: Lab test requests from clinical sessions
+  - name: Pharmacy
+    description: Internal pharmacy prescription queue
+  - name: Patient History
+    description: Patient clinical history
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        patient_id:
+          type: string
+          format: uuid
+        patient_name:
+          type: string
+          example: "Andrea Lalema"
+        doctor_id:
+          type: string
+          format: uuid
+        doctor_name:
+          type: string
+          example: "Dr. Jenny Smith"
+        nurse_id:
+          type: string
+          format: uuid
+          nullable: true
+        session_type:
+          type: string
+          enum: [opd, wound_care, channelling]
+        appointment_id:
+          type: string
+          format: uuid
+          nullable: true
+        chief_complaint:
+          type: string
+          example: "Persistent fever and headache"
+        diagnosis:
+          type: string
+          nullable: true
+          example: "Typhoid Fever"
+        follow_up_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          enum: [open, completed]
+        discount_percent:
+          type: number
+          example: 10
+          nullable: true
+        discount_reason:
+          type: string
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        vitals:
+          $ref: '#/components/schemas/Vitals'
+          nullable: true
+        prescriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Prescription'
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionImage'
+        lab_requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabRequest'
+
+    SessionCreate:
+      type: object
+      required: [patient_id, session_type]
+      properties:
+        patient_id:
+          type: string
+          format: uuid
+        session_type:
+          type: string
+          enum: [opd, wound_care, channelling]
+        appointment_id:
+          type: string
+          format: uuid
+          description: Link to pre-booked appointment if applicable
+        chief_complaint:
+          type: string
+
+    SessionUpdate:
+      type: object
+      properties:
+        chief_complaint:
+          type: string
+        diagnosis:
+          type: string
+        follow_up_date:
+          type: string
+          format: date
+        notes:
+          type: string
+
+    SessionComplete:
+      type: object
+      required: [diagnosis]
+      properties:
+        diagnosis:
+          type: string
+          example: "Typhoid Fever — confirmed by Widal test"
+        discount_percent:
+          type: number
+          minimum: 0
+          maximum: 100
+          default: 0
+          description: 0 means no discount
+        discount_reason:
+          type: string
+          description: Required if discount_percent > 0
+
+    Vitals:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        bpm:
+          type: integer
+          example: 80
+          description: Heart rate in beats per minute
+        temperature:
+          type: number
+          format: float
+          example: 37.2
+          description: Temperature in Celsius
+        blood_pressure_sys:
+          type: integer
+          example: 120
+          description: Systolic pressure mmHg
+        blood_pressure_dia:
+          type: integer
+          example: 80
+          description: Diastolic pressure mmHg
+        spo2:
+          type: integer
+          example: 98
+          description: Oxygen saturation %
+        weight_kg:
+          type: number
+          format: float
+          example: 68.0
+        height_cm:
+          type: integer
+          example: 170
+        blood_sugar:
+          type: number
+          format: float
+          example: 5.4
+          description: Blood glucose mmol/L
+        recorded_at:
+          type: string
+          format: date-time
+
+    VitalsCreate:
+      type: object
+      properties:
+        bpm:
+          type: integer
+          minimum: 20
+          maximum: 300
+        temperature:
+          type: number
+          format: float
+          minimum: 30
+          maximum: 45
+        blood_pressure_sys:
+          type: integer
+        blood_pressure_dia:
+          type: integer
+        spo2:
+          type: integer
+          minimum: 0
+          maximum: 100
+        weight_kg:
+          type: number
+          format: float
+        height_cm:
+          type: integer
+        blood_sugar:
+          type: number
+          format: float
+
+    Prescription:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [internal, external]
+        medicine_name:
+          type: string
+          example: "Amoxicillin"
+        dosage:
+          type: string
+          example: "500mg"
+        frequency:
+          type: string
+          example: "Three times daily after meals"
+        duration_days:
+          type: integer
+          example: 7
+        instructions:
+          type: string
+          nullable: true
+          example: "Take with water"
+        pharmacy_name:
+          type: string
+          nullable: true
+          description: For external prescriptions only
+        status:
+          type: string
+          enum: [pending, dispensed]
+          description: For internal prescriptions only
+        created_at:
+          type: string
+          format: date-time
+
+    PrescriptionCreate:
+      type: object
+      required: [prescriptions]
+      properties:
+        prescriptions:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [type, medicine_name, dosage, frequency, duration_days]
+            properties:
+              type:
+                type: string
+                enum: [internal, external]
+              medicine_name:
+                type: string
+                example: "Paracetamol"
+              dosage:
+                type: string
+                example: "1g"
+              frequency:
+                type: string
+                example: "Every 8 hours"
+              duration_days:
+                type: integer
+                example: 5
+              instructions:
+                type: string
+              pharmacy_name:
+                type: string
+                description: Required for external type
+
+    SessionImage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        file_url:
+          type: string
+          description: Pre-signed MinIO URL (15-min TTL)
+          example: "http://localhost:9000/hms-scans/clinical/sess-uuid/img-uuid.jpg?X-Amz-..."
+        caption:
+          type: string
+          nullable: true
+        image_type:
+          type: string
+          enum: [scan, wound, other]
+        uploaded_at:
+          type: string
+          format: date-time
+
+    LabRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        test_id:
+          type: string
+          format: uuid
+        test_name:
+          type: string
+          example: "Complete Blood Count"
+        urgency:
+          type: string
+          enum: [routine, urgent]
+        lab_order_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set by Lab Service after processing the event
+        order_status:
+          type: string
+          nullable: true
+          enum: [registered, processing, completed, cancelled]
+        requested_at:
+          type: string
+          format: date-time
+
+    LabRequestCreate:
+      type: object
+      required: [tests]
+      properties:
+        tests:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [test_id]
+            properties:
+              test_id:
+                type: string
+                format: uuid
+              urgency:
+                type: string
+                enum: [routine, urgent]
+                default: routine
+        notes:
+          type: string
+          description: Instructions for the lab technician
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            statusCode:
+              type: integer
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  # ─── SESSIONS ───────────────────────────────────────────────
+
+  /sessions:
+    post:
+      tags: [Sessions]
+      summary: Start a new clinical session
+      description: |
+        Creates a new session for a patient visit. Returns the session_id used for all
+        subsequent calls (vitals, diagnoses, prescriptions, images, lab requests).
+        Doctor ID is taken from the JWT (X-User-Id injected by gateway).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionCreate'
+            example:
+              patient_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+              session_type: "opd"
+              chief_complaint: "Persistent fever for 3 days"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Session'
+        "404":
+          description: Patient not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+    get:
+      tags: [Sessions]
+      summary: List sessions
+      description: Doctor sees only their own sessions. Admin sees all.
+      parameters:
+        - name: patient_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: doctor_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: session_type
+          in: query
+          schema:
+            type: string
+            enum: [opd, wound_care, channelling]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, completed]
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Session list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+      security:
+        - bearerAuth: []
+
+  /sessions/{id}:
+    get:
+      tags: [Sessions]
+      summary: Get session by ID
+      description: Returns full session including vitals, prescriptions, images, and lab requests.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Full session detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Session'
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+    put:
+      tags: [Sessions]
+      summary: Update session fields
+      description: Update chief complaint, notes, diagnosis text, or follow-up date. Session must be open.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionUpdate'
+      responses:
+        "200":
+          description: Session updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Session'
+      security:
+        - bearerAuth: []
+
+  /sessions/{id}/complete:
+    put:
+      tags: [Sessions]
+      summary: Complete a session
+      description: |
+        Marks the session as completed. This triggers the billing event:
+        - OPD session → publishes `billing.opd` to RabbitMQ → Finance creates invoice automatically
+        - Wound care → publishes `billing.wound` to RabbitMQ → Finance creates invoice automatically
+        
+        Session cannot be edited after completion.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionComplete'
+            example:
+              diagnosis: "Typhoid Fever — Widal test positive"
+              discount_percent: 0
+      responses:
+        "200":
+          description: Session completed and billing event published
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Session'
+                  message:
+                    type: string
+                    example: "Session completed. Invoice will be created automatically."
+        "422":
+          description: Session already completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+  # ─── VITALS ─────────────────────────────────────────────────
+
+  /sessions/{id}/vitals:
+    post:
+      tags: [Vitals]
+      summary: Record vitals for session
+      description: Save patient vitals for this session. Only one vitals record per session (updates if re-called).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VitalsCreate'
+            example:
+              bpm: 80
+              temperature: 37.8
+              blood_pressure_sys: 120
+              blood_pressure_dia: 80
+              spo2: 98
+              weight_kg: 68.5
+              height_cm: 170
+      responses:
+        "201":
+          description: Vitals recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Vitals'
+      security:
+        - bearerAuth: []
+
+    get:
+      tags: [Vitals]
+      summary: Get vitals for session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Session vitals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Vitals'
+      security:
+        - bearerAuth: []
+
+  /patients/{patientId}/vitals-history:
+    get:
+      tags: [Vitals]
+      summary: Get full vitals history for a patient
+      description: Returns all vitals recorded across all sessions. Used for the health trend charts on the Patient Dashboard.
+      parameters:
+        - name: patientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Vitals history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Vitals'
+                        - type: object
+                          properties:
+                            session_date:
+                              type: string
+                              format: date
+      security:
+        - bearerAuth: []
+
+  # ─── DIAGNOSIS & IMAGES ──────────────────────────────────────
+
+  /sessions/{id}/images:
+    post:
+      tags: [Diagnosis]
+      summary: Upload session image
+      description: |
+        Upload a scan or wound image for this session. File is sent to MinIO (hms-scans/).
+        Returns a pre-signed URL valid for 15 minutes.
+        Accepted types: image/jpeg, image/png. Max size: 10MB.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: Image file. Max 10MB. JPEG or PNG only.
+                caption:
+                  type: string
+                  example: "Left knee anterior X-ray"
+                image_type:
+                  type: string
+                  enum: [scan, wound, other]
+                  default: scan
+      responses:
+        "201":
+          description: Image uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/SessionImage'
+        "400":
+          description: Invalid file type or size exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+    get:
+      tags: [Diagnosis]
+      summary: List session images
+      description: Returns all images for the session with fresh pre-signed URLs.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Session images
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SessionImage'
+      security:
+        - bearerAuth: []
+
+  /sessions/{id}/images/{imageId}:
+    delete:
+      tags: [Diagnosis]
+      summary: Delete a session image
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: imageId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Image deleted
+        "404":
+          description: Image not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+  # ─── PRESCRIPTIONS ───────────────────────────────────────────
+
+  /sessions/{id}/prescriptions:
+    post:
+      tags: [Prescriptions]
+      summary: Add prescriptions to session
+      description: |
+        Add one or more prescriptions. Internal prescriptions appear in the pharmacy queue.
+        External prescriptions can be printed via Finance Service POST /prescriptions/print.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrescriptionCreate'
+            example:
+              prescriptions:
+                - type: internal
+                  medicine_name: "Paracetamol"
+                  dosage: "500mg"
+                  frequency: "Every 8 hours"
+                  duration_days: 5
+                  instructions: "Take with water after meals"
+                - type: external
+                  medicine_name: "Amoxicillin"
+                  dosage: "500mg"
+                  frequency: "Three times daily"
+                  duration_days: 7
+                  pharmacy_name: "Narammala Pharmacy"
+      responses:
+        "201":
+          description: Prescriptions added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Prescription'
+      security:
+        - bearerAuth: []
+
+    get:
+      tags: [Prescriptions]
+      summary: Get session prescriptions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [internal, external]
+      responses:
+        "200":
+          description: Prescriptions list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Prescription'
+      security:
+        - bearerAuth: []
+
+  /sessions/{id}/prescriptions/{rxId}:
+    delete:
+      tags: [Prescriptions]
+      summary: Remove a prescription
+      description: Can only delete prescriptions from open sessions.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: rxId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Prescription removed
+        "422":
+          description: Cannot delete from completed session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+  # ─── LAB REQUESTS ────────────────────────────────────────────
+
+  /sessions/{id}/lab-requests:
+    post:
+      tags: [Lab Requests]
+      summary: Request lab tests for patient
+      description: |
+        Doctor requests one or more lab tests. This publishes a `lab.requested` event
+        to RabbitMQ. The Lab Service picks it up and creates a pre-populated order.
+        The `lab_order_id` on the request will be populated once Lab Service processes the event.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LabRequestCreate'
+            example:
+              tests:
+                - test_id: "uuid-cbc-test"
+                  urgency: "routine"
+                - test_id: "uuid-widal-test"
+                  urgency: "urgent"
+              notes: "Patient has fever for 3 days — suspect typhoid"
+      responses:
+        "201":
+          description: Lab request created and event published
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LabRequest'
+                  message:
+                    type: string
+                    example: "Lab request sent. Lab Service will create the order."
+      security:
+        - bearerAuth: []
+
+    get:
+      tags: [Lab Requests]
+      summary: Get lab requests for session
+      description: Returns all lab test requests with current order status from Lab Service.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Lab requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LabRequest'
+      security:
+        - bearerAuth: []
+
+  # ─── PHARMACY ────────────────────────────────────────────────
+
+  /pharmacy/queue:
+    get:
+      tags: [Pharmacy]
+      summary: Get internal pharmacy prescription queue
+      description: |
+        Returns all internal prescriptions with status = pending across all today's sessions.
+        Used by the Pharmacy Display board to show what needs to be dispensed.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, dispensed]
+            default: pending
+      responses:
+        "200":
+          description: Pharmacy queue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Prescription'
+                        - type: object
+                          properties:
+                            patient_name:
+                              type: string
+                            session_date:
+                              type: string
+                              format: date
+                            doctor_name:
+                              type: string
+      security:
+        - bearerAuth: []
+
+  /pharmacy/{rxId}/dispense:
+    put:
+      tags: [Pharmacy]
+      summary: Mark prescription as dispensed
+      description: Pharmacist marks an internal prescription as dispensed. Updates status to 'dispensed'.
+      parameters:
+        - name: rxId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Prescription dispensed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Prescription'
+      security:
+        - bearerAuth: []
+
+  # ─── PATIENT HISTORY ─────────────────────────────────────────
+
+  /patients/{patientId}/history:
+    get:
+      tags: [Patient History]
+      summary: Get full clinical history for a patient
+      description: |
+        Returns all clinical sessions for a patient with diagnoses, treatments, vitals,
+        and prescriptions. Used in the Patient Profile medical history section.
+      parameters:
+        - name: patientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: session_type
+          in: query
+          schema:
+            type: string
+            enum: [opd, wound_care, channelling]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Patient clinical history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      patient:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          full_name:
+                            type: string
+                          patient_number:
+                            type: string
+                      sessions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Session'
+                      vitals_summary:
+                        type: object
+                        description: Latest vitals values for dashboard display
+                        properties:
+                          latest_bpm:
+                            type: integer
+                          latest_temperature:
+                            type: number
+                          latest_blood_pressure:
+                            type: string
+                            example: "120/80"
+                          latest_weight_kg:
+                            type: number
+                  meta:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                      total:
+                        type: integer
+      security:
+        - bearerAuth: []

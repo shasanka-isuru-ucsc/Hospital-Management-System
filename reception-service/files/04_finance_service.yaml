@@ -1,0 +1,742 @@
+openapi: 3.0.3
+info:
+  title: HMS — Finance Service
+  description: |
+    Handles all billing across every module. Invoices are created automatically via
+    RabbitMQ events (from Clinical, Ward, Lab services) or manually at the billing counter.
+    
+    **Auth:** Keycloak JWT required.
+    
+    **Base URL (via gateway):** `http://localhost:3000/finance`
+    **Direct URL:** `http://localhost:3004`
+    
+    **RabbitMQ events consumed by this service:**
+    - `billing.opd` → auto-creates OPD consultation invoice
+    - `billing.wound` → auto-creates wound care invoice
+    - `billing.ward` → creates/closes ward admission invoice on discharge
+    - `billing.lab` → records lab order payment event
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000/finance
+    description: Via API Gateway
+  - url: http://localhost:3004
+    description: Direct (internal)
+
+tags:
+  - name: Invoices
+    description: Invoice creation, payment, and printing
+  - name: Reports
+    description: Earnings and department statistics for dashboards
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LineItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_id:
+          type: string
+          format: uuid
+        item_name:
+          type: string
+          example: "Doctor Consultation"
+        item_type:
+          type: string
+          enum: [consultation, procedure, medicine, lab_test, bed_charge, wound_care, other]
+        quantity:
+          type: integer
+          example: 1
+        unit_price:
+          type: number
+          format: float
+          example: 1500.00
+        total_price:
+          type: number
+          format: float
+          example: 1500.00
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_number:
+          type: string
+          example: "INV-2026-00001"
+        patient_id:
+          type: string
+          format: uuid
+        patient_name:
+          type: string
+          example: "Andrea Lalema"
+        billing_module:
+          type: string
+          enum: [opd, wound_care, channelling, lab, ward, pharmacy]
+        session_reference_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of the clinical session, lab order, or ward admission
+        line_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItem'
+        subtotal:
+          type: number
+          format: float
+          example: 2000.00
+        discount_amount:
+          type: number
+          format: float
+          example: 200.00
+        discount_reason:
+          type: string
+          nullable: true
+        total_amount:
+          type: number
+          format: float
+          example: 1800.00
+        payment_status:
+          type: string
+          enum: [pending, paid, partial, waived]
+        payment_method:
+          type: string
+          enum: [cash, card, online, insurance]
+          nullable: true
+        source:
+          type: string
+          enum: [event, manual]
+          description: "'event' = auto-created from RabbitMQ; 'manual' = created at billing counter"
+        paid_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_by:
+          type: string
+          description: Staff name who created (manual) or 'system' (event)
+        created_at:
+          type: string
+          format: date-time
+
+    InvoiceCreate:
+      type: object
+      required: [patient_id, billing_module, line_items]
+      properties:
+        patient_id:
+          type: string
+          format: uuid
+        billing_module:
+          type: string
+          enum: [opd, wound_care, channelling, lab, ward, pharmacy]
+        session_reference_id:
+          type: string
+          format: uuid
+        line_items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [item_name, item_type, quantity, unit_price]
+            properties:
+              item_name:
+                type: string
+                example: "Consultation Fee"
+              item_type:
+                type: string
+                enum: [consultation, procedure, medicine, lab_test, bed_charge, wound_care, other]
+              quantity:
+                type: integer
+                minimum: 1
+              unit_price:
+                type: number
+                format: float
+        notes:
+          type: string
+
+    PaymentRecord:
+      type: object
+      required: [payment_method, amount_paid]
+      properties:
+        payment_method:
+          type: string
+          enum: [cash, card, online, insurance]
+        amount_paid:
+          type: number
+          format: float
+          description: Actual amount received
+        notes:
+          type: string
+
+    DiscountApply:
+      type: object
+      required: [discount_type, discount_value, reason]
+      properties:
+        discount_type:
+          type: string
+          enum: [percentage, flat]
+        discount_value:
+          type: number
+          format: float
+          description: Percentage (0-100) or flat monetary amount
+        reason:
+          type: string
+          example: "Staff discount"
+
+    PrintData:
+      type: object
+      description: Invoice data formatted for receipt printing
+      properties:
+        invoice_number:
+          type: string
+        hospital_name:
+          type: string
+          example: "Narammala Channeling Hospital"
+        patient_name:
+          type: string
+        patient_number:
+          type: string
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+        line_items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItem'
+        subtotal:
+          type: number
+        discount_amount:
+          type: number
+        total_amount:
+          type: number
+        payment_method:
+          type: string
+        paid_at:
+          type: string
+          format: date-time
+        cashier_name:
+          type: string
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            statusCode:
+              type: integer
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  # ─── INVOICES ────────────────────────────────────────────────
+
+  /invoices:
+    get:
+      tags: [Invoices]
+      summary: List invoices
+      description: Paginated list of all invoices. Supports filtering by module, status, date range, and patient.
+      parameters:
+        - name: billing_module
+          in: query
+          schema:
+            type: string
+            enum: [opd, wound_care, channelling, lab, ward, pharmacy]
+        - name: payment_status
+          in: query
+          schema:
+            type: string
+            enum: [pending, paid, partial, waived]
+        - name: patient_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2026-02-01"
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          example: "2026-02-28"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Invoice list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Invoice'
+                  meta:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                      limit:
+                        type: integer
+                      total:
+                        type: integer
+                      total_pending_amount:
+                        type: number
+                        description: Sum of all pending invoice totals in this result set
+      security:
+        - bearerAuth: []
+
+    post:
+      tags: [Invoices]
+      summary: Create invoice manually
+      description: |
+        Manually create an invoice at the billing counter (walk-in billing).
+        
+        Most invoices are auto-created by the Finance Service when it receives
+        RabbitMQ events from other services. Use this endpoint only for walk-in 
+        or manually-entered billing scenarios.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceCreate'
+            example:
+              patient_id: "uuid-patient"
+              billing_module: "opd"
+              line_items:
+                - item_name: "Doctor Consultation"
+                  item_type: "consultation"
+                  quantity: 1
+                  unit_price: 1500.00
+                - item_name: "ECG"
+                  item_type: "procedure"
+                  quantity: 1
+                  unit_price: 500.00
+      responses:
+        "201":
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Invoice'
+      security:
+        - bearerAuth: []
+
+  /invoices/{id}:
+    get:
+      tags: [Invoices]
+      summary: Get invoice by ID
+      description: Full invoice with all line items.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Invoice detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Invoice'
+        "404":
+          description: Invoice not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+  /invoices/{id}/pay:
+    put:
+      tags: [Invoices]
+      summary: Record payment
+      description: |
+        Records a payment against an invoice. If amount_paid equals total_amount,
+        payment_status becomes 'paid'. If less, it becomes 'partial'.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRecord'
+            example:
+              payment_method: "cash"
+              amount_paid: 1800.00
+      responses:
+        "200":
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Invoice'
+                  change_amount:
+                    type: number
+                    description: Change to give back if cash overpayment
+                    example: 200.00
+        "422":
+          description: Invoice already fully paid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+  /invoices/{id}/discount:
+    post:
+      tags: [Invoices]
+      summary: Apply discount to invoice
+      description: |
+        Applies or updates a discount on an unpaid invoice.
+        Recalculates total_amount after discount.
+        Cannot apply discount to already-paid invoices.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscountApply'
+            example:
+              discount_type: "percentage"
+              discount_value: 10
+              reason: "Staff family member"
+      responses:
+        "200":
+          description: Discount applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Invoice'
+        "422":
+          description: Cannot discount a paid invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+  /invoices/{id}/print:
+    get:
+      tags: [Invoices]
+      summary: Get print-formatted invoice data
+      description: Returns invoice data structured for receipt printing (A4 or thermal printer format).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Print-ready invoice data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/PrintData'
+      security:
+        - bearerAuth: []
+
+  /prescriptions/print:
+    post:
+      tags: [Invoices]
+      summary: Generate external prescription PDF
+      description: |
+        Generates a formatted PDF prescription for external pharmacy.
+        PDF is uploaded to MinIO (hms-prescriptions/) and a pre-signed download URL is returned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [session_id]
+              properties:
+                session_id:
+                  type: string
+                  format: uuid
+                  description: Clinical session containing external prescriptions
+                doctor_name:
+                  type: string
+                  example: "Dr. Jenny Smith"
+                hospital_name:
+                  type: string
+                  example: "Narammala Channeling Hospital"
+      responses:
+        "200":
+          description: Prescription PDF generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      pdf_url:
+                        type: string
+                        description: Pre-signed MinIO URL (15-min TTL)
+                        example: "http://localhost:9000/hms-prescriptions/rx-uuid.pdf?X-Amz-..."
+                      expires_at:
+                        type: string
+                        format: date-time
+      security:
+        - bearerAuth: []
+
+  # ─── REPORTS ─────────────────────────────────────────────────
+
+  /reports/summary:
+    get:
+      tags: [Reports]
+      summary: Admin dashboard summary
+      description: |
+        Returns the top-line KPIs for the Admin Dashboard:
+        total appointments, new patients, operations count, and total earnings
+        for the current period, plus percentage change vs previous period.
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [today, this_week, this_month, this_year]
+            default: this_month
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      total_appointments:
+                        type: integer
+                        example: 250
+                      appointments_change_pct:
+                        type: number
+                        example: 40
+                        description: "Positive = increase vs last period"
+                      new_patients:
+                        type: integer
+                        example: 140
+                      patients_change_pct:
+                        type: number
+                        example: 20
+                      total_operations:
+                        type: integer
+                        example: 56
+                      operations_change_pct:
+                        type: number
+                        example: -15
+                      total_earnings:
+                        type: number
+                        example: 20250.00
+                      earnings_change_pct:
+                        type: number
+                        example: 30
+                      period:
+                        type: string
+                        example: "this_month"
+      security:
+        - bearerAuth: []
+
+  /reports/earnings:
+    get:
+      tags: [Reports]
+      summary: Earnings chart data
+      description: Monthly earnings breakdown for a given year. Used in the Admin Dashboard earnings chart.
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+            example: 2026
+          description: Year to fetch earnings for. Defaults to current year.
+      responses:
+        "200":
+          description: Monthly earnings data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      year:
+                        type: integer
+                        example: 2026
+                      monthly:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            month:
+                              type: integer
+                              example: 1
+                            month_name:
+                              type: string
+                              example: "Jan"
+                            total:
+                              type: number
+                              example: 18500.00
+                            by_module:
+                              type: object
+                              properties:
+                                opd:
+                                  type: number
+                                wound_care:
+                                  type: number
+                                channelling:
+                                  type: number
+                                lab:
+                                  type: number
+                                ward:
+                                  type: number
+      security:
+        - bearerAuth: []
+
+  /reports/departments:
+    get:
+      tags: [Reports]
+      summary: Department statistics
+      description: Patient count and revenue per department. Used in Admin Dashboard "Patient by Department" and "Top Departments".
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [this_month, this_year, all_time]
+            default: this_month
+      responses:
+        "200":
+          description: Department stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        department_id:
+                          type: string
+                          format: uuid
+                        department_name:
+                          type: string
+                          example: "General Physician"
+                        patient_count:
+                          type: integer
+                          example: 87
+                        patient_percentage:
+                          type: number
+                          example: 35.0
+                        revenue:
+                          type: number
+                          example: 12500.00
+      security:
+        - bearerAuth: []

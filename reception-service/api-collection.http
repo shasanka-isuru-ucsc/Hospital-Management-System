@@ -1,0 +1,154 @@
+### API Tests for Reception Service
+### To run these directly in your IDE, install the "REST Client" extension in VS Code.
+
+@baseUrl = http://localhost:3001
+@receptionistId = a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+### 1. Register a new patient
+# @name registerPatient
+POST {{baseUrl}}/patients
+X-User-Id: {{receptionistId}}
+X-User-Role: receptionist
+Content-Type: application/json
+
+{
+  "firstName": "Amanda",
+  "lastName": "Smith",
+  "mobile": "+94711234567",
+  "dateOfBirth": "1992-05-15",
+  "gender": "female"
+}
+
+###
+
+@patientId = {{registerPatient.response.body.data.id}}
+
+### 2. Get the created patient by ID
+GET {{baseUrl}}/patients/{{patientId}}
+X-User-Id: {{receptionistId}}
+X-User-Role: receptionist
+
+###
+
+### 3. Search patients by mobile/name
+GET {{baseUrl}}/patients/search?q=%2B94711234567
+X-User-Id: {{receptionistId}}
+X-User-Role: receptionist
+
+###
+
+### 4. Update patient details
+# @name updatePatient
+PUT {{baseUrl}}/patients/{{patientId}}
+X-User-Id: {{receptionistId}}
+X-User-Role: receptionist
+Content-Type: application/json
+
+{
+  "firstName": "Amanda",
+  "lastName": "Perera",
+  "mobile": "+94711234567",
+  "dateOfBirth": "1992-05-15",
+  "gender": "female"
+}
+
+###
+
+### 5. Issue a token for OPD
+# @name issueToken
+POST {{baseUrl}}/tokens
+X-User-Id: {{receptionistId}}
+X-User-Role: receptionist
+Content-Type: application/json
+
+{
+  "patientId": "{{patientId}}",
+  "queueType": "opd"
+}
+
+###
+
+@tokenId = {{issueToken.response.body.data.id}}
+
+### 6. Get all tokens for today 
+GET {{baseUrl}}/tokens/today
+X-User-Id: {{receptionistId}}
+X-User-Role: receptionist
+
+###
+
+### 7. Get OPD live queue
+GET {{baseUrl}}/queue/opd
+X-User-Id: {{receptionistId}}
+X-User-Role: receptionist
+
+### 
+
+### 8. Update token status to 'called'
+PUT {{baseUrl}}/tokens/{{tokenId}}/status
+X-User-Id: {{receptionistId}}
+X-User-Role: receptionist
+Content-Type: application/json
+
+{
+  "status": "called"
+}
+
+###
+
+### 9. Book an appointment
+
+# @name bookAppointment
+POST {{baseUrl}}/appointments
+X-User-Id: {{receptionistId}}
+X-User-Role: receptionist
+Content-Type: application/json
+
+{
+  "patientId": "{{patientId}}",
+  "doctorId": "d2c3b4a5-e5f6-7890-abcd-ef1234567890",
+  "appointmentDate": "2026-03-01",
+  "fromTime": "09:00",
+  "toTime": "09:15"
+}
+
+
+###
+
+@appointmentId = {{bookAppointment.response.body.data.id}}
+
+### 10. Get appointment by ID
+GET {{baseUrl}}/appointments/{{appointmentId}}
+X-User-Id: {{receptionistId}}
+X-User-Role: receptionist
+
+###
+
+### 11. List appointments for a specific date
+GET {{baseUrl}}/appointments?date=2026-03-01
+X-User-Id: {{receptionistId}}
+X-User-Role: receptionist
+
+###
+
+### 12. Update appointment details (JSON)
+PUT {{baseUrl}}/appointments/{{appointmentId}}
+X-User-Id: {{receptionistId}}
+X-User-Role: receptionist
+Content-Type: application/json
+
+{
+  "doctorId": "d2c3b4a5-e5f6-7890-abcd-ef1234567890",
+  "appointmentDate": "2026-03-01",
+  "fromTime": "09:00",
+  "toTime": "09:15",
+  "treatment": "checkup",
+  "notes": "notes",
+  "status": "scheduled"
+}
+
+### 13. Cancel an appointment
+DELETE {{baseUrl}}/appointments/{{appointmentId}}
+X-User-Id: {{receptionistId}}
+X-User-Role: receptionist
+

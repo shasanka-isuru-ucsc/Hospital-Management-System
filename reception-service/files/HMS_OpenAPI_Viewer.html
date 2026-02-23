@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HMS — OpenAPI Specs</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07090f;--bg2:#0d1117;--bg3:#141a23;--bg4:#1a2332;
+  --border:rgba(148,163,184,.1);--border2:rgba(148,163,184,.18);
+  --text:#e2e8f0;--muted:#64748b;--muted2:#94a3b8;
+  --get:#3b82f6;--post:#10b981;--put:#f59e0b;--delete:#ef4444;--patch:#8b5cf6;
+  --get-bg:rgba(59,130,246,.1);--post-bg:rgba(16,185,129,.1);
+  --put-bg:rgba(245,158,11,.1);--delete-bg:rgba(239,68,68,.1);--patch-bg:rgba(139,92,246,.1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:"Syne",sans-serif;display:flex;min-height:100vh}
+body::before{content:"";position:fixed;inset:0;background-image:linear-gradient(rgba(148,163,184,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,.02) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+
+/* SIDEBAR */
+.sidebar{width:260px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border2);height:100vh;position:sticky;top:0;overflow-y:auto;z-index:10;display:flex;flex-direction:column}
+.sidebar-hdr{padding:20px 16px 14px;border-bottom:1px solid var(--border)}
+.sidebar-hdr h2{font-size:13px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;background:linear-gradient(90deg,#93c5fd,#67e8f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sidebar-hdr p{font-family:"JetBrains Mono",monospace;font-size:9px;color:var(--muted);margin-top:4px}
+.sidebar-search{padding:10px 12px;border-bottom:1px solid var(--border)}
+.sidebar-search input{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:6px 10px;font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--text);outline:none}
+.sidebar-search input:focus{border-color:rgba(59,130,246,.5)}
+.sidebar-search input::placeholder{color:var(--muted)}
+.svc-nav{padding:8px 0}
+.svc-nav-item{display:flex;align-items:center;gap:8px;padding:8px 16px;cursor:pointer;transition:all .15s;border-left:3px solid transparent}
+.svc-nav-item:hover{background:rgba(255,255,255,.03);border-left-color:rgba(255,255,255,.1)}
+.svc-nav-item.active{background:rgba(255,255,255,.05);border-left-color:var(--svc-color)}
+.svc-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.svc-nav-label{font-size:12px;font-weight:600;flex:1}
+.svc-nav-port{font-family:"JetBrains Mono",monospace;font-size:9px;color:var(--muted);background:rgba(0,0,0,.3);padding:1px 5px;border-radius:2px}
+.tag-nav{margin-left:16px;border-left:1px solid var(--border);padding-left:0}
+.tag-nav-item{display:flex;align-items:center;gap:6px;padding:5px 10px 5px 12px;cursor:pointer;font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--muted);transition:all .15s;border-radius:0 4px 4px 0}
+.tag-nav-item:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.tag-nav-item.active-tag{color:var(--text)}
+.tag-count{margin-left:auto;font-size:9px;background:rgba(255,255,255,.08);padding:1px 5px;border-radius:10px}
+
+/* MAIN */
+.main{flex:1;overflow-y:auto;min-height:100vh;position:relative;z-index:1}
+.main-hdr{padding:28px 32px 0;border-bottom:1px solid var(--border);margin-bottom:0}
+.main-hdr-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap}
+.svc-title{font-size:22px;font-weight:800;letter-spacing:-.01em}
+.svc-badge{display:inline-flex;align-items:center;gap:6px;font-family:"JetBrains Mono",monospace;font-size:10px;border:1px solid;border-radius:3px;padding:3px 9px;margin-top:4px}
+.svc-desc{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.5;max-width:700px}
+.svc-stats{display:flex;gap:16px;padding:12px 0;flex-wrap:wrap}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat-val{font-size:20px;font-weight:800}
+.stat-lbl{font-family:"JetBrains Mono",monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+
+/* CONTENT */
+.content{padding:0 32px 60px}
+
+/* TAG GROUP */
+.tag-group{margin-top:28px}
+.tag-hdr{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.tag-hdr h3{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted2)}
+.tag-hdr-count{font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--muted);background:rgba(255,255,255,.06);padding:2px 7px;border-radius:10px}
+
+/* ENDPOINT CARD */
+.ep-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;overflow:hidden;transition:border-color .2s}
+.ep-card:hover{border-color:var(--border2)}
+.ep-card.open{border-color:var(--ep-color,rgba(59,130,246,.4))}
+.ep-hdr{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;user-select:none}
+.method-badge{font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:600;padding:3px 8px;border-radius:3px;min-width:56px;text-align:center;flex-shrink:0}
+.ep-path{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--muted2);flex:1;word-break:break-all}
+.ep-summary{font-size:11px;color:var(--muted);flex:1;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ep-chevron{color:var(--muted);font-size:12px;transition:transform .2s;flex-shrink:0}
+.ep-card.open .ep-chevron{transform:rotate(180deg)}
+
+/* ENDPOINT BODY */
+.ep-body{display:none;padding:0 14px 14px;border-top:1px solid var(--border)}
+.ep-card.open .ep-body{display:block}
+.ep-desc{font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--muted2);line-height:1.65;margin:12px 0;white-space:pre-wrap}
+.section-lbl{font-family:"JetBrains Mono",monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:12px 0 6px;display:flex;align-items:center;gap:8px}
+.section-lbl::after{content:"";flex:1;height:1px;background:var(--border)}
+
+/* PARAMS TABLE */
+.params-table{width:100%;border-collapse:collapse;font-family:"JetBrains Mono",monospace;font-size:10px}
+.params-table th{text-align:left;padding:5px 8px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.params-table td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top}
+.params-table tr:last-child td{border-bottom:none}
+.param-name{color:#93c5fd}
+.param-type{color:var(--muted);font-size:9px}
+.param-req{color:#f59e0b;font-size:9px}
+.param-opt{color:var(--muted);font-size:9px}
+.param-desc{color:var(--muted2);font-size:9px;line-height:1.4}
+.param-enum{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px}
+.enum-val{font-size:8px;padding:1px 5px;border-radius:2px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--muted)}
+
+/* RESPONSES */
+.response-row{display:flex;align-items:flex-start;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.response-row:last-child{border-bottom:none}
+.resp-code{font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:600;min-width:36px}
+.resp-desc{font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--muted2)}
+.code-2xx{color:#10b981}
+.code-4xx{color:#f59e0b}
+.code-5xx{color:#ef4444}
+
+/* FIELDS TABLE */
+.fields-table{width:100%;border-collapse:collapse;font-family:"JetBrains Mono",monospace;font-size:10px}
+.fields-table th{text-align:left;padding:5px 8px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-size:9px;text-transform:uppercase;letter-spacing:.08em;background:rgba(255,255,255,.02)}
+.fields-table td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top}
+.fields-table tr:last-child td{border-bottom:none}
+.field-required{color:#f59e0b;font-size:9px;font-weight:600}
+.field-optional{color:var(--muted);font-size:9px}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:60px 20px;color:var(--muted);font-family:"JetBrains Mono",monospace;font-size:11px}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(148,163,184,.2);border-radius:2px}
+::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.35)}
+</style>
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="sidebar-hdr">
+    <h2>HMS API Specs</h2>
+    <p>6 microservices · 85 endpoints</p>
+  </div>
+  <div class="sidebar-search">
+    <input type="text" id="search" placeholder="Search endpoints…" oninput="filterEndpoints(this.value)">
+  </div>
+  <div class="svc-nav" id="svc-nav"></div>
+</nav>
+
+<div class="main" id="main">
+  <div class="main-hdr" id="main-hdr"></div>
+  <div class="content" id="content"></div>
+</div>
+
+<script>
+const SPECS = [{"label": "Reception", "color": "#3b82f6", "port": "3001", "description": "Manages patient registration, queue token issuance, and appointment booking.", "endpoints": [{"method": "GET", "path": "/patients", "summary": "List all patients", "description": "Paginated list of all registered patients. Supports name/mobile search.", "tag": "Patients", "request_body": null, "query_params": [{"name": "search", "required": false, "description": "Search by name or mobile number", "type": "string", "enum": null}, {"name": "status", "required": false, "description": "", "type": "string", "enum": ["active", "inactive"]}, {"name": "page", "required": false, "description": "", "type": "integer", "enum": null}, {"name": "limit", "required": false, "description": "", "type": "integer", "enum": null}], "path_params": [], "responses": [{"code": "200", "description": "Paginated patient list"}, {"code": "401", "description": "Missing or invalid JWT"}]}, {"method": "POST", "path": "/patients", "summary": "Register a new patient", "description": "Creates a new patient record. The patient_number is auto-generated (R00001, R00002\u2026).\nAvatar file upload is optional via multipart/form-data.", "tag": "Patients", "request_body": {"content_type": "multipart/form-data"}, "query_params": [], "path_params": [], "responses": [{"code": "201", "description": "Patient registered successfully"}, {"code": "409", "description": "Mobile number already registered"}]}, {"method": "GET", "path": "/patients/search", "summary": "Search patients by name or mobile", "description": "Lightweight search used for autocomplete in appointment booking and token issuance. Returns basic info only.", "tag": "Patients", "request_body": null, "query_params": [{"name": "q", "required": true, "description": "Search term \u2014 matches against first_name, last_name, or mobile", "type": "string", "enum": null}], "path_params": [], "responses": [{"code": "200", "description": "Matching patients"}]}, {"method": "GET", "path": "/patients/{id}", "summary": "Get patient by ID", "description": "", "tag": "Patients", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Patient record"}, {"code": "404", "description": "Patient not found"}]}, {"method": "PUT", "path": "/patients/{id}", "summary": "Update patient details", "description": "Receptionist can update patient contact details, address, triage etc.", "tag": "Patients", "request_body": {"content_type": "multipart/form-data"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Patient updated"}, {"code": "404", "description": "Patient not found"}]}, {"method": "POST", "path": "/tokens", "summary": "Issue a queue token", "description": "Issues a queue token for a patient. Token numbers reset daily per queue type.\nOn creation, publishes a `queue.updated` event to RabbitMQ, which the API Gateway\nbridges to connected Queue Display boards via WebSocket.", "tag": "Tokens", "request_body": {"content_type": "application/json", "example": "{\n  \"patient_id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n  \"queue_type\": \"opd\"\n}"}, "query_params": [], "path_params": [], "responses": [{"code": "201", "description": "Token issued"}, {"code": "422", "description": "Patient already has an active token for this queue today"}]}, {"method": "GET", "path": "/tokens/today", "summary": "All tokens issued today", "description": "Returns all tokens for today across all queue types with current status.", "tag": "Tokens", "request_body": null, "query_params": [{"name": "queue_type", "required": false, "description": "", "type": "string", "enum": ["opd", "wound_care", "doctor_consultation"]}, {"name": "status", "required": false, "description": "", "type": "string", "enum": ["waiting", "called", "in_progress", "completed", "skipped", "cancelled"]}], "path_params": [], "responses": [{"code": "200", "description": "Today's tokens"}]}, {"method": "PUT", "path": "/tokens/{id}/status", "summary": "Update token status", "description": "Updates the token status. This is the primary action for the queue workflow:\n- Receptionist calls patient: waiting \u2192 called\n- Doctor starts: called \u2192 in_progress  \n- Doctor finishes: in_progress \u2192 completed\n\nEvery status change publishes a `queue.updated` RabbitMQ fanout event,\nwhich instantly refreshes all Queue Display boards via WebSocket.", "tag": "Tokens", "request_body": {"content_type": "application/json", "example": "{\n  \"status\": \"called\"\n}"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Token status updated"}, {"code": "404", "description": "Token not found"}]}, {"method": "GET", "path": "/queue/{type}", "summary": "Get live queue for a type", "description": "Returns all active tokens for the given queue type today, sorted by token_number.\nUsed by the Queue Display board (polls or receives via WebSocket push).\nDoctor sees only their own queue when queue_type = doctor_consultation.", "tag": "Queue", "request_body": null, "query_params": [{"name": "doctor_id", "required": false, "description": "Filter by doctor (for doctor_consultation queue)", "type": "string", "enum": null}], "path_params": ["type"], "responses": [{"code": "200", "description": "Current queue state"}]}, {"method": "GET", "path": "/appointments", "summary": "List appointments", "description": "Returns appointments with optional filters. \n- Admin/Receptionist: sees all appointments\n- Doctor: sees only their own appointments (filtered server-side by X-User-Id)", "tag": "Appointments", "request_body": null, "query_params": [{"name": "doctor_id", "required": false, "description": "", "type": "string", "enum": null}, {"name": "date", "required": false, "description": "", "type": "string", "enum": null}, {"name": "status", "required": false, "description": "", "type": "string", "enum": ["scheduled", "ongoing", "completed", "cancelled", "rescheduled"]}, {"name": "patient_id", "required": false, "description": "", "type": "string", "enum": null}, {"name": "page", "required": false, "description": "", "type": "integer", "enum": null}, {"name": "limit", "required": false, "description": "", "type": "integer", "enum": null}], "path_params": [], "responses": [{"code": "200", "description": "Appointment list"}]}, {"method": "POST", "path": "/appointments", "summary": "Book an appointment", "description": "Book a new appointment. Validates that the doctor has an available slot at the given time.\nIf patient_id is provided and patient is found, their details auto-fill.", "tag": "Appointments", "request_body": {"content_type": "multipart/form-data"}, "query_params": [], "path_params": [], "responses": [{"code": "201", "description": "Appointment booked"}, {"code": "422", "description": "Slot not available or doctor unavailable"}]}, {"method": "GET", "path": "/appointments/{id}", "summary": "Get appointment by ID", "description": "", "tag": "Appointments", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Appointment detail"}, {"code": "404", "description": "Appointment not found"}]}, {"method": "PUT", "path": "/appointments/{id}", "summary": "Update / reschedule appointment", "description": "", "tag": "Appointments", "request_body": {"content_type": "application/json"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Appointment updated"}, {"code": "404", "description": "Appointment not found"}]}, {"method": "DELETE", "path": "/appointments/{id}", "summary": "Cancel appointment", "description": "", "tag": "Appointments", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "204", "description": "Appointment cancelled"}, {"code": "404", "description": "Appointment not found"}]}], "tags": ["Patients", "Tokens", "Queue", "Appointments"]}, {"label": "Clinical", "color": "#10b981", "port": "3002", "description": "Manages clinical sessions (OPD, wound care, channelling), vitals recording, diagnoses,", "endpoints": [{"method": "POST", "path": "/sessions", "summary": "Start a new clinical session", "description": "Creates a new session for a patient visit. Returns the session_id used for all\nsubsequent calls (vitals, diagnoses, prescriptions, images, lab requests).\nDoctor ID is taken from the JWT (X-User-Id injected by gateway).", "tag": "Sessions", "request_body": {"content_type": "application/json", "example": "{\n  \"patient_id\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n  \"session_type\": \"opd\",\n  \"chief_complaint\": \"Persistent fever for 3 days\"\n}"}, "query_params": [], "path_params": [], "responses": [{"code": "201", "description": "Session created"}, {"code": "404", "description": "Patient not found"}]}, {"method": "GET", "path": "/sessions", "summary": "List sessions", "description": "Doctor sees only their own sessions. Admin sees all.", "tag": "Sessions", "request_body": null, "query_params": [{"name": "patient_id", "required": false, "description": "", "type": "string", "enum": null}, {"name": "doctor_id", "required": false, "description": "", "type": "string", "enum": null}, {"name": "session_type", "required": false, "description": "", "type": "string", "enum": ["opd", "wound_care", "channelling"]}, {"name": "status", "required": false, "description": "", "type": "string", "enum": ["open", "completed"]}, {"name": "date", "required": false, "description": "", "type": "string", "enum": null}, {"name": "page", "required": false, "description": "", "type": "integer", "enum": null}, {"name": "limit", "required": false, "description": "", "type": "integer", "enum": null}], "path_params": [], "responses": [{"code": "200", "description": "Session list"}]}, {"method": "GET", "path": "/sessions/{id}", "summary": "Get session by ID", "description": "Returns full session including vitals, prescriptions, images, and lab requests.", "tag": "Sessions", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Full session detail"}, {"code": "404", "description": "Session not found"}]}, {"method": "PUT", "path": "/sessions/{id}", "summary": "Update session fields", "description": "Update chief complaint, notes, diagnosis text, or follow-up date. Session must be open.", "tag": "Sessions", "request_body": {"content_type": "application/json", "fields": [{"name": "chief_complaint", "type": "string", "required": false, "description": ""}, {"name": "diagnosis", "type": "string", "required": false, "description": ""}, {"name": "follow_up_date", "type": "string", "required": false, "description": ""}, {"name": "notes", "type": "string", "required": false, "description": ""}]}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Session updated"}]}, {"method": "PUT", "path": "/sessions/{id}/complete", "summary": "Complete a session", "description": "Marks the session as completed. This triggers the billing event:\n- OPD session \u2192 publishes `billing.opd` to RabbitMQ \u2192 Finance creates invoice automatically\n- Wound care \u2192 publishes `billing.wound` to RabbitMQ \u2192 Finance creates invoice automatically\n\nSession cannot be edited after completion.", "tag": "Sessions", "request_body": {"content_type": "application/json", "example": "{\n  \"diagnosis\": \"Typhoid Fever \\u2014 Widal test positive\",\n  \"discount_percent\": 0\n}"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Session completed and billing event published"}, {"code": "422", "description": "Session already completed"}]}, {"method": "POST", "path": "/sessions/{id}/vitals", "summary": "Record vitals for session", "description": "Save patient vitals for this session. Only one vitals record per session (updates if re-called).", "tag": "Vitals", "request_body": {"content_type": "application/json", "example": "{\n  \"bpm\": 80,\n  \"temperature\": 37.8,\n  \"blood_pressure_sys\": 120,\n  \"blood_pressure_dia\": 80,\n  \"spo2\": 98,\n  \"weight_kg\": 68.5,\n  \"height_cm\": 170\n}"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "201", "description": "Vitals recorded"}]}, {"method": "GET", "path": "/sessions/{id}/vitals", "summary": "Get vitals for session", "description": "", "tag": "Vitals", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Session vitals"}]}, {"method": "GET", "path": "/patients/{patientId}/vitals-history", "summary": "Get full vitals history for a patient", "description": "Returns all vitals recorded across all sessions. Used for the health trend charts on the Patient Dashboard.", "tag": "Vitals", "request_body": null, "query_params": [{"name": "from", "required": false, "description": "", "type": "string", "enum": null}, {"name": "to", "required": false, "description": "", "type": "string", "enum": null}], "path_params": ["patientId"], "responses": [{"code": "200", "description": "Vitals history"}]}, {"method": "POST", "path": "/sessions/{id}/images", "summary": "Upload session image", "description": "Upload a scan or wound image for this session. File is sent to MinIO (hms-scans/).\nReturns a pre-signed URL valid for 15 minutes.\nAccepted types: image/jpeg, image/png. Max size: 10MB.", "tag": "Diagnosis", "request_body": {"content_type": "multipart/form-data"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "201", "description": "Image uploaded"}, {"code": "400", "description": "Invalid file type or size exceeded"}]}, {"method": "GET", "path": "/sessions/{id}/images", "summary": "List session images", "description": "Returns all images for the session with fresh pre-signed URLs.", "tag": "Diagnosis", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Session images"}]}, {"method": "DELETE", "path": "/sessions/{id}/images/{imageId}", "summary": "Delete a session image", "description": "", "tag": "Diagnosis", "request_body": null, "query_params": [], "path_params": ["id", "imageId"], "responses": [{"code": "204", "description": "Image deleted"}, {"code": "404", "description": "Image not found"}]}, {"method": "POST", "path": "/sessions/{id}/prescriptions", "summary": "Add prescriptions to session", "description": "Add one or more prescriptions. Internal prescriptions appear in the pharmacy queue.\nExternal prescriptions can be printed via Finance Service POST /prescriptions/print.", "tag": "Prescriptions", "request_body": {"content_type": "application/json", "example": "{\n  \"prescriptions\": [\n    {\n      \"type\": \"internal\",\n      \"medicine_name\": \"Paracetamol\",\n      \"dosage\": \"500mg\",\n      \"frequency\": \"Every 8 hours\",\n      \"duration_days\": 5,\n      \"instructions\": \"Take with water after meals\"\n    },\n    {\n      \"type\": \"external\",\n      \"medicine_name\": \"Amoxicillin\",\n      \"dosage\": \"500mg\",\n      \"frequency\": \"Three times daily\",\n      \"duration_days\": 7,\n      \"pharmacy_name\": \"Narammala Pharmacy\"\n    }\n  ]\n}"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "201", "description": "Prescriptions added"}]}, {"method": "GET", "path": "/sessions/{id}/prescriptions", "summary": "Get session prescriptions", "description": "", "tag": "Prescriptions", "request_body": null, "query_params": [{"name": "type", "required": false, "description": "", "type": "string", "enum": ["internal", "external"]}], "path_params": ["id"], "responses": [{"code": "200", "description": "Prescriptions list"}]}, {"method": "DELETE", "path": "/sessions/{id}/prescriptions/{rxId}", "summary": "Remove a prescription", "description": "Can only delete prescriptions from open sessions.", "tag": "Prescriptions", "request_body": null, "query_params": [], "path_params": ["id", "rxId"], "responses": [{"code": "204", "description": "Prescription removed"}, {"code": "422", "description": "Cannot delete from completed session"}]}, {"method": "POST", "path": "/sessions/{id}/lab-requests", "summary": "Request lab tests for patient", "description": "Doctor requests one or more lab tests. This publishes a `lab.requested` event\nto RabbitMQ. The Lab Service picks it up and creates a pre-populated order.\nThe `lab_order_id` on the request will be populated once Lab Service processes the event.", "tag": "Lab Requests", "request_body": {"content_type": "application/json", "example": "{\n  \"tests\": [\n    {\n      \"test_id\": \"uuid-cbc-test\",\n      \"urgency\": \"routine\"\n    },\n    {\n      \"test_id\": \"uuid-widal-test\",\n      \"urgency\": \"urgent\"\n    }\n  ],\n  \"notes\": \"Patient has fever for 3 days \\u2014 suspect typhoid\"\n}"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "201", "description": "Lab request created and event published"}]}, {"method": "GET", "path": "/sessions/{id}/lab-requests", "summary": "Get lab requests for session", "description": "Returns all lab test requests with current order status from Lab Service.", "tag": "Lab Requests", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Lab requests"}]}, {"method": "GET", "path": "/pharmacy/queue", "summary": "Get internal pharmacy prescription queue", "description": "Returns all internal prescriptions with status = pending across all today's sessions.\nUsed by the Pharmacy Display board to show what needs to be dispensed.", "tag": "Pharmacy", "request_body": null, "query_params": [{"name": "status", "required": false, "description": "", "type": "string", "enum": ["pending", "dispensed"]}], "path_params": [], "responses": [{"code": "200", "description": "Pharmacy queue"}]}, {"method": "PUT", "path": "/pharmacy/{rxId}/dispense", "summary": "Mark prescription as dispensed", "description": "Pharmacist marks an internal prescription as dispensed. Updates status to 'dispensed'.", "tag": "Pharmacy", "request_body": null, "query_params": [], "path_params": ["rxId"], "responses": [{"code": "200", "description": "Prescription dispensed"}]}, {"method": "GET", "path": "/patients/{patientId}/history", "summary": "Get full clinical history for a patient", "description": "Returns all clinical sessions for a patient with diagnoses, treatments, vitals,\nand prescriptions. Used in the Patient Profile medical history section.", "tag": "Patient History", "request_body": null, "query_params": [{"name": "session_type", "required": false, "description": "", "type": "string", "enum": ["opd", "wound_care", "channelling"]}, {"name": "from", "required": false, "description": "", "type": "string", "enum": null}, {"name": "to", "required": false, "description": "", "type": "string", "enum": null}, {"name": "page", "required": false, "description": "", "type": "integer", "enum": null}, {"name": "limit", "required": false, "description": "", "type": "integer", "enum": null}], "path_params": ["patientId"], "responses": [{"code": "200", "description": "Patient clinical history"}]}], "tags": ["Sessions", "Vitals", "Diagnosis", "Prescriptions", "Lab Requests", "Pharmacy", "Patient History"]}, {"label": "Staff", "color": "#8b5cf6", "port": "3003", "description": "Manages doctors, departments, availability schedules, and nurse allocations.", "endpoints": [{"method": "GET", "path": "/doctors", "summary": "List all doctors", "description": "", "tag": "Doctors", "request_body": null, "query_params": [{"name": "department_id", "required": false, "description": "", "type": "string", "enum": null}, {"name": "status", "required": false, "description": "", "type": "string", "enum": ["active", "inactive"]}, {"name": "search", "required": false, "description": "Search by name or designation", "type": "string", "enum": null}, {"name": "page", "required": false, "description": "", "type": "integer", "enum": null}, {"name": "limit", "required": false, "description": "", "type": "integer", "enum": null}], "path_params": [], "responses": [{"code": "200", "description": "Doctor list"}]}, {"method": "POST", "path": "/doctors", "summary": "Create doctor profile + Keycloak account", "description": "Creates the doctor record in the database AND creates a Keycloak user account.\nThe Keycloak account will have the `doctor` role assigned.\nThe doctor can log in immediately with the provided username and password.\n\nAvatar and banner images can be uploaded as multipart.", "tag": "Doctors", "request_body": {"content_type": "multipart/form-data"}, "query_params": [], "path_params": [], "responses": [{"code": "201", "description": "Doctor created (DB + Keycloak)"}, {"code": "409", "description": "Username or email already taken in Keycloak"}]}, {"method": "GET", "path": "/doctors/{id}", "summary": "Get doctor profile", "description": "Full doctor profile. Doctors can view their own; admin can view any.", "tag": "Doctors", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Doctor profile"}, {"code": "404", "description": "Doctor not found"}]}, {"method": "PUT", "path": "/doctors/{id}", "summary": "Update doctor profile", "description": "Admin can update any doctor. Doctor can update own non-sensitive fields (bio, avatar).", "tag": "Doctors", "request_body": {"content_type": "multipart/form-data"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Doctor updated"}]}, {"method": "DELETE", "path": "/doctors/{id}", "summary": "Deactivate doctor", "description": "Soft-delete: sets doctor status to inactive AND disables the Keycloak account.\nThe doctor cannot log in after this. Data is preserved for historical records.", "tag": "Doctors", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Doctor deactivated (DB + Keycloak)"}, {"code": "404", "description": "Doctor not found"}]}, {"method": "GET", "path": "/departments", "summary": "List all departments", "description": "Available to any authenticated user.", "tag": "Departments", "request_body": null, "query_params": [], "path_params": [], "responses": [{"code": "200", "description": "Department list"}]}, {"method": "POST", "path": "/departments", "summary": "Create department", "description": "", "tag": "Departments", "request_body": {"content_type": "application/json"}, "query_params": [], "path_params": [], "responses": [{"code": "201", "description": "Department created"}]}, {"method": "PUT", "path": "/departments/{id}", "summary": "Update department", "description": "", "tag": "Departments", "request_body": {"content_type": "application/json"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Department updated"}]}, {"method": "DELETE", "path": "/departments/{id}", "summary": "Delete department", "description": "Cannot delete if active doctors are assigned to this department.", "tag": "Departments", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "204", "description": "Department deleted"}, {"code": "422", "description": "Cannot delete \u2014 active doctors assigned"}]}, {"method": "GET", "path": "/doctors/{id}/schedule", "summary": "Get doctor schedule", "description": "Returns all active schedule entries for the doctor.", "tag": "Schedules", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Doctor schedule"}]}, {"method": "POST", "path": "/doctors/{id}/schedule", "summary": "Add schedule entry", "description": "Add a new availability slot for the doctor.", "tag": "Schedules", "request_body": {"content_type": "application/json", "example": "{\n  \"day_of_week\": 1,\n  \"start_time\": \"08:00\",\n  \"end_time\": \"12:00\",\n  \"slot_duration_minutes\": 15,\n  \"max_patients\": 16\n}"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "201", "description": "Schedule entry added"}]}, {"method": "PUT", "path": "/schedules/{id}", "summary": "Update schedule entry", "description": "", "tag": "Schedules", "request_body": {"content_type": "application/json"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Schedule updated"}]}, {"method": "DELETE", "path": "/schedules/{id}", "summary": "Remove schedule entry", "description": "", "tag": "Schedules", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "204", "description": "Schedule entry removed"}]}, {"method": "GET", "path": "/doctors/{id}/availability", "summary": "Get available slots for a date", "description": "Returns all time slots for a doctor on a given date based on their schedule,\nwith availability status (some may already be booked).\nUsed by Reception when booking appointments.", "tag": "Schedules", "request_body": null, "query_params": [{"name": "date", "required": true, "description": "", "type": "string", "enum": null}], "path_params": ["id"], "responses": [{"code": "200", "description": "Available time slots"}, {"code": "404", "description": "Doctor has no schedule for that day"}]}, {"method": "GET", "path": "/nurse-allocations", "summary": "List nurse allocations", "description": "", "tag": "Nurse Allocations", "request_body": null, "query_params": [{"name": "doctor_id", "required": false, "description": "", "type": "string", "enum": null}, {"name": "date", "required": false, "description": "", "type": "string", "enum": null}, {"name": "status", "required": false, "description": "", "type": "string", "enum": ["active", "completed", "cancelled"]}], "path_params": [], "responses": [{"code": "200", "description": "Allocation list"}]}, {"method": "POST", "path": "/nurse-allocations", "summary": "Allocate nurse to doctor session", "description": "Allocates a nurse to a doctor for a session date.\nValidates that the nurse is not already allocated to another doctor on that date.\nA nurse can only have one active allocation at a time.", "tag": "Nurse Allocations", "request_body": {"content_type": "application/json", "example": "{\n  \"nurse_id\": \"uuid-nurse\",\n  \"doctor_id\": \"uuid-doctor\",\n  \"session_date\": \"2026-02-21\"\n}"}, "query_params": [], "path_params": [], "responses": [{"code": "201", "description": "Nurse allocated"}, {"code": "422", "description": "Nurse already allocated on this date"}]}, {"method": "PUT", "path": "/nurse-allocations/{id}/complete", "summary": "Complete nurse allocation", "description": "Marks the allocation as complete (session is over).\nThis frees the nurse to be allocated to another doctor.", "tag": "Nurse Allocations", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Allocation completed. Nurse is now free."}]}, {"method": "DELETE", "path": "/nurse-allocations/{id}", "summary": "Cancel nurse allocation", "description": "", "tag": "Nurse Allocations", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Allocation cancelled"}]}, {"method": "GET", "path": "/staff/available", "summary": "Get available staff for allocation", "description": "Returns staff members (nurses) who are not already allocated on the given date.", "tag": "Nurse Allocations", "request_body": null, "query_params": [{"name": "date", "required": true, "description": "", "type": "string", "enum": null}, {"name": "role", "required": false, "description": "", "type": "string", "enum": ["nurse"]}], "path_params": [], "responses": [{"code": "200", "description": "Available staff"}]}], "tags": ["Doctors", "Departments", "Schedules", "Nurse Allocations"]}, {"label": "Finance", "color": "#f59e0b", "port": "3004", "description": "Handles all billing across every module. Invoices are created automatically via", "endpoints": [{"method": "GET", "path": "/invoices", "summary": "List invoices", "description": "Paginated list of all invoices. Supports filtering by module, status, date range, and patient.", "tag": "Invoices", "request_body": null, "query_params": [{"name": "billing_module", "required": false, "description": "", "type": "string", "enum": ["opd", "wound_care", "channelling", "lab", "ward", "pharmacy"]}, {"name": "payment_status", "required": false, "description": "", "type": "string", "enum": ["pending", "paid", "partial", "waived"]}, {"name": "patient_id", "required": false, "description": "", "type": "string", "enum": null}, {"name": "from", "required": false, "description": "", "type": "string", "enum": null}, {"name": "to", "required": false, "description": "", "type": "string", "enum": null}, {"name": "page", "required": false, "description": "", "type": "integer", "enum": null}, {"name": "limit", "required": false, "description": "", "type": "integer", "enum": null}], "path_params": [], "responses": [{"code": "200", "description": "Invoice list"}]}, {"method": "POST", "path": "/invoices", "summary": "Create invoice manually", "description": "Manually create an invoice at the billing counter (walk-in billing).\n\nMost invoices are auto-created by the Finance Service when it receives\nRabbitMQ events from other services. Use this endpoint only for walk-in \nor manually-entered billing scenarios.", "tag": "Invoices", "request_body": {"content_type": "application/json", "example": "{\n  \"patient_id\": \"uuid-patient\",\n  \"billing_module\": \"opd\",\n  \"line_items\": [\n    {\n      \"item_name\": \"Doctor Consultation\",\n      \"item_type\": \"consultation\",\n      \"quantity\": 1,\n      \"unit_price\": 1500.0\n    },\n    {\n      \"item_name\": \"ECG\",\n      \"item_type\": \"procedure\",\n      \"quantity\": 1,\n      \"unit_price\": 500.0\n    }\n  ]\n}"}, "query_params": [], "path_params": [], "responses": [{"code": "201", "description": "Invoice created"}]}, {"method": "GET", "path": "/invoices/{id}", "summary": "Get invoice by ID", "description": "Full invoice with all line items.", "tag": "Invoices", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Invoice detail"}, {"code": "404", "description": "Invoice not found"}]}, {"method": "PUT", "path": "/invoices/{id}/pay", "summary": "Record payment", "description": "Records a payment against an invoice. If amount_paid equals total_amount,\npayment_status becomes 'paid'. If less, it becomes 'partial'.", "tag": "Invoices", "request_body": {"content_type": "application/json", "example": "{\n  \"payment_method\": \"cash\",\n  \"amount_paid\": 1800.0\n}"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Payment recorded"}, {"code": "422", "description": "Invoice already fully paid"}]}, {"method": "POST", "path": "/invoices/{id}/discount", "summary": "Apply discount to invoice", "description": "Applies or updates a discount on an unpaid invoice.\nRecalculates total_amount after discount.\nCannot apply discount to already-paid invoices.", "tag": "Invoices", "request_body": {"content_type": "application/json", "example": "{\n  \"discount_type\": \"percentage\",\n  \"discount_value\": 10,\n  \"reason\": \"Staff family member\"\n}"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Discount applied"}, {"code": "422", "description": "Cannot discount a paid invoice"}]}, {"method": "GET", "path": "/invoices/{id}/print", "summary": "Get print-formatted invoice data", "description": "Returns invoice data structured for receipt printing (A4 or thermal printer format).", "tag": "Invoices", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Print-ready invoice data"}]}, {"method": "POST", "path": "/prescriptions/print", "summary": "Generate external prescription PDF", "description": "Generates a formatted PDF prescription for external pharmacy.\nPDF is uploaded to MinIO (hms-prescriptions/) and a pre-signed download URL is returned.", "tag": "Invoices", "request_body": {"content_type": "application/json"}, "query_params": [], "path_params": [], "responses": [{"code": "200", "description": "Prescription PDF generated"}]}, {"method": "GET", "path": "/reports/summary", "summary": "Admin dashboard summary", "description": "Returns the top-line KPIs for the Admin Dashboard:\ntotal appointments, new patients, operations count, and total earnings\nfor the current period, plus percentage change vs previous period.", "tag": "Reports", "request_body": null, "query_params": [{"name": "period", "required": false, "description": "", "type": "string", "enum": ["today", "this_week", "this_month", "this_year"]}], "path_params": [], "responses": [{"code": "200", "description": "Dashboard summary"}]}, {"method": "GET", "path": "/reports/earnings", "summary": "Earnings chart data", "description": "Monthly earnings breakdown for a given year. Used in the Admin Dashboard earnings chart.", "tag": "Reports", "request_body": null, "query_params": [{"name": "year", "required": false, "description": "Year to fetch earnings for. Defaults to current year.", "type": "integer", "enum": null}], "path_params": [], "responses": [{"code": "200", "description": "Monthly earnings data"}]}, {"method": "GET", "path": "/reports/departments", "summary": "Department statistics", "description": "Patient count and revenue per department. Used in Admin Dashboard \"Patient by Department\" and \"Top Departments\".", "tag": "Reports", "request_body": null, "query_params": [{"name": "period", "required": false, "description": "", "type": "string", "enum": ["this_month", "this_year", "all_time"]}], "path_params": [], "responses": [{"code": "200", "description": "Department stats"}]}], "tags": ["Invoices", "Reports"]}, {"label": "Lab", "color": "#14b8a6", "port": "3005", "description": "Manages the laboratory: test catalog, patient registration for tests, result entry, ", "endpoints": [{"method": "GET", "path": "/tests", "summary": "Get test catalog", "description": "Full list of available lab tests with prices. Used when booking tests or building order forms.", "tag": "Tests", "request_body": null, "query_params": [{"name": "category", "required": false, "description": "", "type": "string", "enum": null}, {"name": "search", "required": false, "description": "Search by name or code", "type": "string", "enum": null}, {"name": "is_active", "required": false, "description": "", "type": "boolean", "enum": null}], "path_params": [], "responses": [{"code": "200", "description": "Test catalog"}]}, {"method": "POST", "path": "/tests", "summary": "Add test to catalog", "description": "", "tag": "Tests", "request_body": {"content_type": "application/json", "example": "{\n  \"name\": \"Widal Test\",\n  \"code\": \"WIDAL\",\n  \"category\": \"Microbiology\",\n  \"unit_price\": 500.0,\n  \"turnaround_hours\": 24,\n  \"reference_range\": \"Negative < 1:80 titre\"\n}"}, "query_params": [], "path_params": [], "responses": [{"code": "201", "description": "Test added to catalog"}, {"code": "409", "description": "Test code already exists"}]}, {"method": "PUT", "path": "/tests/{id}", "summary": "Update test details or price", "description": "", "tag": "Tests", "request_body": {"content_type": "application/json"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Test updated"}, {"code": "404", "description": "Test not found"}]}, {"method": "DELETE", "path": "/tests/{id}", "summary": "Remove test from catalog", "description": "Soft-delete \u2014 sets is_active to false. Cannot hard-delete if orders exist.", "tag": "Tests", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "204", "description": "Test deactivated"}, {"code": "422", "description": "Cannot delete \u2014 orders exist for this test"}]}, {"method": "POST", "path": "/orders", "summary": "Register a lab order (walk-in)", "description": "Creates a lab order for a patient. Computes total from test catalog prices.\n\nFor **clinical session requests**, orders are created automatically when the Lab Service \nconsumes the `lab.requested` RabbitMQ event. You only need this endpoint for walk-in patients.", "tag": "Orders", "request_body": {"content_type": "application/json", "example": "{\n  \"patient_name\": \"Andrea Lalema\",\n  \"patient_mobile\": \"+94771234567\",\n  \"source\": \"walk_in\",\n  \"tests\": [\n    {\n      \"test_id\": \"uuid-cbc\",\n      \"urgency\": \"routine\"\n    },\n    {\n      \"test_id\": \"uuid-widal\",\n      \"urgency\": \"urgent\"\n    }\n  ],\n  \"notes\": \"Patient reports 4 days of fever\"\n}"}, "query_params": [], "path_params": [], "responses": [{"code": "201", "description": "Order registered"}, {"code": "400", "description": "Invalid test IDs or missing required patient info"}]}, {"method": "GET", "path": "/orders", "summary": "List lab orders", "description": "Paginated list of orders. Lab tech sees all. Doctor sees orders linked to their sessions only.", "tag": "Orders", "request_body": null, "query_params": [{"name": "patient_id", "required": false, "description": "", "type": "string", "enum": null}, {"name": "status", "required": false, "description": "", "type": "string", "enum": ["registered", "processing", "completed", "cancelled"]}, {"name": "payment_status", "required": false, "description": "", "type": "string", "enum": ["pending", "paid"]}, {"name": "source", "required": false, "description": "", "type": "string", "enum": ["walk_in", "clinical_request"]}, {"name": "date", "required": false, "description": "Filter by creation date", "type": "string", "enum": null}, {"name": "page", "required": false, "description": "", "type": "integer", "enum": null}, {"name": "limit", "required": false, "description": "", "type": "integer", "enum": null}], "path_params": [], "responses": [{"code": "200", "description": "Order list"}]}, {"method": "GET", "path": "/orders/{id}", "summary": "Get order by ID", "description": "Full order detail with all tests and their results.", "tag": "Orders", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Order detail"}, {"code": "404", "description": "Order not found"}]}, {"method": "PUT", "path": "/orders/{id}/results", "summary": "Enter test results", "description": "Lab technician enters results for one or more tests in the order.\nCan be called multiple times \u2014 each call updates the specified order_test entries.\nOrder status automatically becomes `processing` on first result entry,\nand `completed` when all tests have results.", "tag": "Orders", "request_body": {"content_type": "application/json", "example": "{\n  \"results\": [\n    {\n      \"order_test_id\": \"uuid-order-test-1\",\n      \"result_value\": \"WBC: 9.2 x10\\u00b3/\\u03bcL, RBC: 4.8 x10\\u2076/\\u03bcL, Hgb: 13.5 g/dL\",\n      \"is_abnormal\": false,\n      \"technician_notes\": \"Normal range\"\n    },\n    {\n      \"order_test_id\": \"uuid-order-test-2\",\n      \"result_value\": \"S.Typhi O: 1:160, S.Typhi H: 1:320\",\n      \"is_abnormal\": true,\n      \"technician_notes\": \"Significant titre \\u2014 suggest clinical correlation\"\n    }\n  ]\n}"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Results recorded"}, {"code": "404", "description": "Order not found"}, {"code": "422", "description": "Order is cancelled or already completed"}]}, {"method": "POST", "path": "/orders/{id}/report", "summary": "Upload packaged report PDF", "description": "Lab technician uploads the final report PDF for the order.\nFile is stored in MinIO under `hms-lab-reports/`.\nOrder status is set to `completed` after upload.\nReturns a pre-signed URL for download (15-min TTL).", "tag": "Orders", "request_body": {"content_type": "multipart/form-data"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Report uploaded and order marked completed"}, {"code": "404", "description": "Order not found"}]}, {"method": "PUT", "path": "/orders/{id}/pay", "summary": "Record lab order payment", "description": "Records payment for a lab order. After recording, publishes `billing.lab` event\nto RabbitMQ so Finance Service can log the payment in its records.\n\n**RabbitMQ event published:**\n```\nExchange: billing.events\nRouting key: billing.lab\nPayload: { order_id, patient_id, patient_name, tests, total_amount, payment_method, paid_at }\n```", "tag": "Orders", "request_body": {"content_type": "application/json", "example": "{\n  \"payment_method\": \"cash\",\n  \"amount_paid\": 1250.0\n}"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Payment recorded and billing event published"}, {"code": "422", "description": "Order already paid"}]}, {"method": "GET", "path": "/patients/{patientId}/history", "summary": "Get patient lab history", "description": "All lab orders and results for a patient across all visits. Used in Doctor and Patient dashboards.", "tag": "History", "request_body": null, "query_params": [{"name": "from", "required": false, "description": "", "type": "string", "enum": null}, {"name": "to", "required": false, "description": "", "type": "string", "enum": null}, {"name": "page", "required": false, "description": "", "type": "integer", "enum": null}, {"name": "limit", "required": false, "description": "", "type": "integer", "enum": null}], "path_params": ["patientId"], "responses": [{"code": "200", "description": "Patient lab history"}]}], "tags": ["Tests", "Orders", "History"]}, {"label": "Ward", "color": "#f97316", "port": "3006", "description": "Manages the admission ward: bed availability, patient admissions, daily service/charge", "endpoints": [{"method": "GET", "path": "/wards", "summary": "List all wards with occupancy", "description": "Returns all wards with real-time bed availability counts. Used in the Admin Dashboard ward overview.", "tag": "Wards", "request_body": null, "query_params": [{"name": "type", "required": false, "description": "", "type": "string", "enum": ["general", "icu", "private", "semi_private"]}, {"name": "is_active", "required": false, "description": "", "type": "boolean", "enum": null}], "path_params": [], "responses": [{"code": "200", "description": "Ward list with occupancy"}]}, {"method": "POST", "path": "/wards", "summary": "Create a new ward", "description": "Admin only. Creates ward and auto-generates beds based on capacity.", "tag": "Wards", "request_body": {"content_type": "application/json", "example": "{\n  \"name\": \"Female General Ward\",\n  \"type\": \"general\",\n  \"capacity\": 15\n}"}, "query_params": [], "path_params": [], "responses": [{"code": "201", "description": "Ward created with beds"}]}, {"method": "GET", "path": "/beds", "summary": "List beds", "description": "Returns beds with current status. Filter by ward or status to find available beds.", "tag": "Wards", "request_body": null, "query_params": [{"name": "ward_id", "required": false, "description": "", "type": "string", "enum": null}, {"name": "status", "required": false, "description": "", "type": "string", "enum": ["available", "occupied", "maintenance", "reserved"]}], "path_params": [], "responses": [{"code": "200", "description": "Bed list"}]}, {"method": "PUT", "path": "/beds/{id}", "summary": "Update bed status", "description": "Admin can manually change bed status (e.g., set to maintenance).", "tag": "Wards", "request_body": {"content_type": "application/json"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Bed updated"}, {"code": "422", "description": "Cannot change status of an occupied bed"}]}, {"method": "POST", "path": "/admissions", "summary": "Admit a patient", "description": "Admits a patient and assigns them to a specific bed.\nThe bed status changes to `occupied` immediately.\nCannot admit a patient if they already have an active admission.", "tag": "Admissions", "request_body": {"content_type": "application/json", "example": "{\n  \"patient_id\": \"uuid-patient\",\n  \"bed_id\": \"uuid-bed-101\",\n  \"attending_doctor_id\": \"uuid-doctor\",\n  \"admission_reason\": \"High fever with suspected typhoid \\u2014 IV treatment required\",\n  \"notes\": \"Allergic to Penicillin\"\n}"}, "query_params": [], "path_params": [], "responses": [{"code": "201", "description": "Patient admitted"}, {"code": "422", "description": "Bed not available or patient already admitted"}]}, {"method": "GET", "path": "/admissions", "summary": "List admissions", "description": "Paginated list of admissions. Supports filtering by ward, status, and date range.", "tag": "Admissions", "request_body": null, "query_params": [{"name": "ward_id", "required": false, "description": "", "type": "string", "enum": null}, {"name": "status", "required": false, "description": "", "type": "string", "enum": ["admitted", "discharged"]}, {"name": "attending_doctor_id", "required": false, "description": "", "type": "string", "enum": null}, {"name": "from", "required": false, "description": "", "type": "string", "enum": null}, {"name": "to", "required": false, "description": "", "type": "string", "enum": null}, {"name": "page", "required": false, "description": "", "type": "integer", "enum": null}, {"name": "limit", "required": false, "description": "", "type": "integer", "enum": null}], "path_params": [], "responses": [{"code": "200", "description": "Admission list"}]}, {"method": "GET", "path": "/admissions/{id}", "summary": "Get admission by ID", "description": "Full admission detail including all services and running total.", "tag": "Admissions", "request_body": null, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Admission detail"}, {"code": "404", "description": "Admission not found"}]}, {"method": "PUT", "path": "/admissions/{id}/discharge", "summary": "Discharge patient", "description": "Discharges a patient from the ward. This triggers the following:\n\n1. Admission status set to `discharged`, `discharged_at` set to now\n2. Bed status set back to `available`\n3. All ward services fetched and total computed\n4. `billing.ward` event published to RabbitMQ:\n\n```json\n{\n  \"admission_id\": \"uuid\",\n  \"patient_id\": \"uuid\",\n  \"patient_name\": \"Andrea Lalema\",\n  \"ward_name\": \"Male General Ward\",\n ", "tag": "Admissions", "request_body": {"content_type": "application/json", "example": "{\n  \"discharge_notes\": \"Patient recovered well. Discharge with oral antibiotics x 7 days.\",\n  \"discharge_diagnosis\": \"Typhoid Fever \\u2014 resolved with IV Ceftriaxone\"\n}"}, "query_params": [], "path_params": ["id"], "responses": [{"code": "200", "description": "Patient discharged and billing event published"}, {"code": "404", "description": "Admission not found"}, {"code": "422", "description": "Patient is already discharged"}]}, {"method": "GET", "path": "/patients/{patientId}/admissions", "summary": "Get patient admission history", "description": "All ward admissions for a patient including discharge summaries.", "tag": "Admissions", "request_body": null, "query_params": [{"name": "page", "required": false, "description": "", "type": "integer", "enum": null}, {"name": "limit", "required": false, "description": "", "type": "integer", "enum": null}], "path_params": ["patientId"], "responses": [{"code": "200", "description": "Patient admission history"}]}, {"method": "POST", "path": "/admissions/{id}/services", "summary": "Add a service charge to admission", "description": "Ward staff add charges to the admission billing stack throughout the patient's stay.\nCommon entries: daily bed charge, medications, procedures, investigations, meals.\n\nThese accumulate and are all included in the `billing.ward` event payload on discharge.", "tag": "Services", "request_body": {"content_type": "application/json", "fields": [{"name": "service_name", "type": "string", "required": true, "description": "Daily Bed Charge"}, {"name": "service_type", "type": "string", "required": true, "description": ""}, {"name": "quantity", "type": "integer", "required": true, "description": 1}, {"name": "unit_price", "type": "number", "required": true, "description": 2500.0}, {"name": "notes", "type": "string", "required": false, "description": ""}, {"name": "provided_at", "type": "string", "required": false, "description": "Defaults to current timestamp if not provided"}]}, "query_params": [], "path_params": ["id"], "responses": [{"code": "201", "description": "Service charge added"}, {"code": "404", "description": "Admission not found"}, {"code": "422", "description": "Cannot add services to a discharged admission"}]}, {"method": "GET", "path": "/admissions/{id}/services", "summary": "Get all services for an admission", "description": "Returns the full service charge stack with running total. Used at the bedside and billing counter.", "tag": "Services", "request_body": null, "query_params": [{"name": "service_type", "required": false, "description": "", "type": "string", "enum": ["medication", "procedure", "bed_charge", "investigation", "meal", "other"]}], "path_params": ["id"], "responses": [{"code": "200", "description": "Service list with running total"}]}, {"method": "DELETE", "path": "/admissions/{id}/services/{serviceId}", "summary": "Remove a service charge", "description": "Remove an incorrectly added service charge.\nOnly allowed while the admission is still active (not discharged).", "tag": "Services", "request_body": null, "query_params": [], "path_params": ["id", "serviceId"], "responses": [{"code": "200", "description": "Service charge removed"}, {"code": "404", "description": "Service charge not found"}, {"code": "422", "description": "Cannot remove services from discharged admission"}]}], "tags": ["Wards", "Admissions", "Services"]}];
+
+let currentSvc = 0;
+let currentTag = null;
+let searchQuery = '';
+
+const methodColors = {
+  GET: {bg:'var(--get-bg)', color:'var(--get)'},
+  POST: {bg:'var(--post-bg)', color:'var(--post)'},
+  PUT: {bg:'var(--put-bg)', color:'var(--put)'},
+  PATCH: {bg:'var(--patch-bg)', color:'var(--patch)'},
+  DELETE: {bg:'var(--delete-bg)', color:'var(--delete)'},
+};
+
+function methodBadge(method) {
+  const mc = methodColors[method] || {bg:'rgba(255,255,255,.08)', color:'#e2e8f0'};
+  return `<span class="method-badge" style="background:${mc.bg};color:${mc.color}">${method}</span>`;
+}
+
+function buildNav() {
+  const nav = document.getElementById('svc-nav');
+  nav.innerHTML = SPECS.map((svc, i) => `
+    <div>
+      <div class="svc-nav-item${i===currentSvc?' active':''}" style="--svc-color:${svc.color}" onclick="selectSvc(${i})">
+        <div class="svc-dot" style="background:${svc.color}"></div>
+        <span class="svc-nav-label">${svc.label}</span>
+        <span class="svc-nav-port">:${svc.port}</span>
+      </div>
+      ${i===currentSvc ? svc.tags.map(t => {
+        const count = svc.endpoints.filter(e=>e.tag===t).length;
+        return `<div class="tag-nav"><div class="tag-nav-item${currentTag===t?' active-tag':''}" onclick="selectTag('${t}',event)">
+          <span>▸</span> ${t} <span class="tag-count">${count}</span>
+        </div></div>`;
+      }).join('') : ''}
+    </div>
+  `).join('');
+}
+
+function selectSvc(i) {
+  currentSvc = i;
+  currentTag = null;
+  searchQuery = '';
+  document.getElementById('search').value = '';
+  buildNav();
+  renderMain();
+  document.getElementById('main').scrollTo(0,0);
+}
+
+function selectTag(tag, e) {
+  e.stopPropagation();
+  currentTag = currentTag === tag ? null : tag;
+  buildNav();
+  renderMain();
+  // scroll to tag
+  setTimeout(() => {
+    const el = document.getElementById('tag-' + tag.replace(/[^a-z0-9]/gi,'_'));
+    if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 50);
+}
+
+function filterEndpoints(q) {
+  searchQuery = q.toLowerCase();
+  renderMain();
+}
+
+function renderMain() {
+  const svc = SPECS[currentSvc];
+  
+  // Header
+  document.getElementById('main-hdr').innerHTML = `
+    <div class="main-hdr-top">
+      <div>
+        <div class="svc-title" style="color:${svc.color}">${svc.label} Service</div>
+        <div class="svc-badge" style="color:${svc.color};border-color:${svc.color}40">
+          <span>⬡</span> http://localhost:3000/${svc.label.toLowerCase()} (gateway) · localhost:${svc.port} (direct)
+        </div>
+      </div>
+    </div>
+    <p class="svc-desc">${svc.description}</p>
+    <div class="svc-stats">
+      <div class="stat"><div class="stat-val" style="color:${svc.color}">${svc.endpoints.length}</div><div class="stat-lbl">Endpoints</div></div>
+      <div class="stat"><div class="stat-val" style="color:${svc.color}">${svc.tags.length}</div><div class="stat-lbl">Tag Groups</div></div>
+      <div class="stat"><div class="stat-val" style="color:${svc.color}">${['GET','POST','PUT','PATCH','DELETE'].map(m=>svc.endpoints.filter(e=>e.method===m).length).filter(Boolean).join('·')}</div><div class="stat-lbl">GET·POST·PUT·DELETE</div></div>
+    </div>
+  `;
+  
+  // Endpoints
+  let filtered = svc.endpoints;
+  if(searchQuery) {
+    filtered = filtered.filter(e => 
+      e.path.toLowerCase().includes(searchQuery) || 
+      e.summary.toLowerCase().includes(searchQuery) ||
+      e.method.toLowerCase().includes(searchQuery) ||
+      e.tag.toLowerCase().includes(searchQuery)
+    );
+  }
+  if(currentTag && !searchQuery) {
+    filtered = filtered.filter(e => e.tag === currentTag);
+  }
+  
+  const groupedByTag = {};
+  filtered.forEach(ep => {
+    (groupedByTag[ep.tag] = groupedByTag[ep.tag] || []).push(ep);
+  });
+  
+  if(filtered.length === 0) {
+    document.getElementById('content').innerHTML = `<div class="empty">No endpoints match "${searchQuery}"</div>`;
+    return;
+  }
+  
+  const html = Object.entries(groupedByTag).map(([tag, eps]) => `
+    <div class="tag-group" id="tag-${tag.replace(/[^a-z0-9]/gi,'_')}">
+      <div class="tag-hdr">
+        <h3>${tag}</h3>
+        <span class="tag-hdr-count">${eps.length} endpoint${eps.length!==1?'s':''}</span>
+      </div>
+      ${eps.map((ep, ei) => renderEndpoint(ep, tag+ei)).join('')}
+    </div>
+  `).join('');
+  
+  document.getElementById('content').innerHTML = html;
+}
+
+function renderEndpoint(ep, uid) {
+  const mc = methodColors[ep.method] || {bg:'rgba(255,255,255,.08)',color:'#e2e8f0'};
+  
+  // Request body section
+  let rbHtml = '';
+  if(ep.request_body) {
+    const rb = ep.request_body;
+    rbHtml = `<div class="section-lbl">Request Body <span style="color:var(--muted2);text-transform:none;letter-spacing:0">${rb.content_type||''}</span></div>`;
+    if(rb.fields && rb.fields.length) {
+      rbHtml += `<table class="fields-table">
+        <tr><th>Field</th><th>Type</th><th>Required</th><th>Notes</th></tr>
+        ${rb.fields.map(f=>`
+          <tr>
+            <td class="param-name">${f.name}</td>
+            <td class="param-type">${f.type}</td>
+            <td>${f.required?'<span class="field-required">required</span>':'<span class="field-optional">optional</span>'}</td>
+            <td class="param-desc">${f.description||''}</td>
+          </tr>`).join('')}
+      </table>`;
+    } else if(rb.example) {
+      rbHtml += `<pre style="background:#0f172a;border:1px solid #1e293b;border-radius:5px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#94a3b8;overflow-x:auto">${escapeHtml(rb.example)}</pre>`;
+    }
+  }
+  
+  // Query params
+  let qpHtml = '';
+  if(ep.query_params && ep.query_params.length) {
+    qpHtml = `<div class="section-lbl">Query Parameters</div>
+      <table class="params-table">
+        <tr><th>Name</th><th>Type</th><th></th><th>Description</th></tr>
+        ${ep.query_params.map(p=>`
+          <tr>
+            <td class="param-name">${p.name}</td>
+            <td class="param-type">${p.type}</td>
+            <td>${p.required?'<span class="param-req">required</span>':'<span class="param-opt">optional</span>'}</td>
+            <td>
+              <span class="param-desc">${p.description||''}</span>
+              ${p.enum ? `<div class="param-enum">${p.enum.map(v=>`<span class="enum-val">${v}</span>`).join('')}</div>` : ''}
+            </td>
+          </tr>`).join('')}
+      </table>`;
+  }
+  
+  // Path params
+  let ppHtml = '';
+  if(ep.path_params && ep.path_params.length) {
+    ppHtml = `<div class="section-lbl">Path Parameters</div>
+      <table class="params-table">
+        <tr><th>Name</th><th>Type</th><th></th><th>Description</th></tr>
+        ${ep.path_params.map(p=>`
+          <tr>
+            <td class="param-name">${p}</td>
+            <td class="param-type">uuid / string</td>
+            <td><span class="param-req">required</span></td>
+            <td class="param-desc">URL path parameter</td>
+          </tr>`).join('')}
+      </table>`;
+  }
+  
+  // Responses
+  let respHtml = '';
+  if(ep.responses && ep.responses.length) {
+    respHtml = `<div class="section-lbl">Responses</div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:8px 12px">
+        ${ep.responses.map(r => {
+          const cls = r.code.startsWith('2') ? 'code-2xx' : r.code.startsWith('4') ? 'code-4xx' : 'code-5xx';
+          return `<div class="response-row">
+            <span class="resp-code ${cls}">${r.code}</span>
+            <span class="resp-desc">${r.description}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+  }
+  
+  const svc = SPECS[currentSvc];
+  const fullPath = `/api${ep.path}`;
+  
+  return `
+    <div class="ep-card" id="ep-${uid}" style="--ep-color:${svc.color}40">
+      <div class="ep-hdr" onclick="toggleEp('ep-${uid}')">
+        ${methodBadge(ep.method)}
+        <code class="ep-path">${ep.path}</code>
+        <span class="ep-summary">${ep.summary}</span>
+        <span class="ep-chevron">▾</span>
+      </div>
+      <div class="ep-body">
+        ${ep.description ? `<p class="ep-desc">${ep.description}</p>` : ''}
+        ${ppHtml}
+        ${qpHtml}
+        ${rbHtml}
+        ${respHtml}
+      </div>
+    </div>
+  `;
+}
+
+function toggleEp(id) {
+  const card = document.getElementById(id);
+  card.classList.toggle('open');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Init
+buildNav();
+renderMain();
+</script>
+</body>
+</html>
