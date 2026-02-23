@@ -4,6 +4,7 @@
 ### ─── SESSIONS ───
 
 ### Create a new clinical session
+# @name createClinicalSession
 POST http://localhost:3002/sessions
 Content-Type: application/json
 X-User-Id: 00000000-0000-0000-0000-000000000001
@@ -20,6 +21,7 @@ X-User-Name: Dr. Jenny Smith
 ### List sessions
 GET http://localhost:3002/sessions?page=1&limit=20
 
+@sessionId = {{createClinicalSession.response.body.data.id}}
 ###
 
 ### Get session by ID
@@ -68,7 +70,9 @@ Content-Type: application/json
 ### Get vitals
 GET http://localhost:3002/sessions/{{sessionId}}/vitals
 
+
 ###
+@patientId = {{createClinicalSession.response.body.data.patientId}}
 
 ### Get vitals history for patient
 GET http://localhost:3002/patients/{{patientId}}/vitals-history
@@ -76,6 +80,7 @@ GET http://localhost:3002/patients/{{patientId}}/vitals-history
 ### ─── PRESCRIPTIONS ───
 
 ### Add prescriptions
+# @name addPrescriptions
 POST http://localhost:3002/sessions/{{sessionId}}/prescriptions
 Content-Type: application/json
 
@@ -116,6 +121,9 @@ GET http://localhost:3002/sessions/{{sessionId}}/prescriptions?type=internal
 GET http://localhost:3002/pharmacy/queue
 
 ###
+
+# Prescription ID
+@rxId = 50d75423-839d-4dd7-9743-2bb37dffc3d7
 
 ### Dispense prescription
 PUT http://localhost:3002/pharmacy/{{rxId}}/dispense
