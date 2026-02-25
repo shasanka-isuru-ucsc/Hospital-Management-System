@@ -1,0 +1,127 @@
+### HMS Staff Service API Collection
+
+@baseUrl = http://localhost:3003
+@keycloakUrl = http://localhost:8080
+@realm = hms
+@clientId = hms-staff-service
+@clientSecret = your-client-secret
+
+### 0. Get Access Token
+# @name getToken
+POST {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id={{clientId}}&client_secret={{clientSecret}}&username=admin&password=admin
+
+### Token variable (auto-filled after running step 0)
+@adminToken = {{getToken.response.body.access_token}}
+
+@doctorId = {{createDoctor.response.body.data.id}}
+@deptId = {{createDepartment.response.body.data.id}}
+@scheduleId = {{addSchedule.response.body.data.id}}
+@allocationId = {{allocateNurse.response.body.data.id}}
+
+### 1. Create a Department
+# @name createDepartment
+POST {{baseUrl}}/departments
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Cardiology",
+  "description": "Heart and Cardiovascular health specialists"
+}
+
+### 2. List Departments
+GET {{baseUrl}}/departments
+Authorization: Bearer {{adminToken}}
+
+### 3. Create a Doctor (DB + Keycloak)
+# @name createDoctor
+POST {{baseUrl}}/doctors
+Authorization: Bearer {{adminToken}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="data"
+Content-Type: application/json
+
+{
+  "firstName": "Jenny",
+  "lastName": "Smith",
+  "username": "dr.jennysmith",
+  "email": "jenny.smith@hms.com",
+  "mobile": "+94771234567",
+  "password": "Password123!",
+  "dateOfBirth": "1985-06-15",
+  "gender": "female",
+  "education": "MBBS, MD",
+  "designation": "Senior Physician",
+  "departmentId": "{{deptId}}",
+  "address": "123 Main St",
+  "city": "Colombo",
+  "country": "Sri Lanka",
+  "biography": "Experienced physician specializing in general medicine."
+}
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="avatar"; filename="avatar.jpg"
+Content-Type: image/jpeg
+
+< ./files/dr-jenny.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### 4. Get All Doctors
+GET {{baseUrl}}/doctors?page=1&limit=10
+Authorization: Bearer {{adminToken}}
+
+### 5. Get Doctor Profile
+GET {{baseUrl}}/doctors/{{doctorId}}
+Authorization: Bearer {{adminToken}}
+
+### 6. Add Doctor Schedule
+# @name addSchedule
+POST {{baseUrl}}/doctors/{{doctorId}}/schedule
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "dayOfWeek": 1,
+  "startTime": "08:00",
+  "endTime": "12:00",
+  "slotDurationMinutes": 15,
+  "maxPatients": 16
+}
+
+### 7. Get Doctor Schedule
+GET {{baseUrl}}/doctors/{{doctorId}}/schedule
+Authorization: Bearer {{adminToken}}
+
+### 8. Get Availability Slots
+GET {{baseUrl}}/doctors/{{doctorId}}/availability?date=2026-03-02
+Authorization: Bearer {{adminToken}}
+
+### 9. Allocate Nurse to Session
+# @name allocateNurse
+POST {{baseUrl}}/nurse-allocations
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "nurseId": "617495f3-529a-4712-9c76-2e860953c89f",
+  "nurseName": "Sarah Williams",
+  "doctorId": "{{doctorId}}",
+  "sessionDate": "2026-03-02",
+  "allocatedBy": "Receptionist Alan"
+}
+
+### 10. List Allocations
+GET {{baseUrl}}/nurse-allocations?date=2026-03-02
+Authorization: Bearer {{adminToken}}
+
+### 11. Complete Allocation
+PUT {{baseUrl}}/nurse-allocations/{{allocationId}}/complete
+Authorization: Bearer {{adminToken}}
+
+### 12. Deactivate Doctor
+DELETE {{baseUrl}}/doctors/{{doctorId}}
+Authorization: Bearer {{adminToken}}

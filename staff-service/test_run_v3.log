@@ -1,0 +1,620 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------------------------< com.hms:staff >----------------------------
+[INFO] Building staff-service 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ staff ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ staff ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ staff ---
+[INFO] Copying 1 resource from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.14.1:testCompile (default-testCompile) @ staff ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- surefire:3.5.4:test (default-test) @ staff ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.hms.staff.StaffServiceIntegrationTest
+20:50:56.356 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.hms.staff.StaffServiceIntegrationTest]: StaffServiceIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+20:50:56.540 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.hms.staff.StaffServiceApplication for test class com.hms.staff.StaffServiceIntegrationTest
+20:50:56.709 [main] INFO org.testcontainers.images.PullPolicy -- Image pull policy will be performed by: DefaultPullPolicy()
+20:50:56.713 [main] INFO org.testcontainers.utility.ImageNameSubstitutor -- Image name substitution will be performed by: DefaultImageNameSubstitutor (composite of 'ConfigurationFileImageNameSubstitutor' and 'PrefixingImageNameSubstitutor')
+20:50:56.749 [main] INFO org.testcontainers.DockerClientFactory -- Testcontainers version: 1.21.4
+20:50:57.006 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Loaded org.testcontainers.dockerclient.UnixSocketClientProviderStrategy from ~/.testcontainers.properties, will try it first
+20:50:57.354 [main] INFO org.testcontainers.dockerclient.DockerClientProviderStrategy -- Found Docker environment with local Unix socket (unix:///var/run/docker.sock)
+20:50:57.355 [main] INFO org.testcontainers.DockerClientFactory -- Docker host IP address is localhost
+20:50:57.376 [main] INFO org.testcontainers.DockerClientFactory -- Connected to docker: 
+  Server Version: 27.3.1
+  API Version: 1.47
+  Operating System: Fedora Linux 39 (Workstation Edition)
+  Total Memory: 31863 MB
+20:50:57.457 [main] INFO tc.testcontainers/ryuk:0.12.0 -- Creating container for image: testcontainers/ryuk:0.12.0
+20:50:57.742 [main] INFO tc.testcontainers/ryuk:0.12.0 -- Container testcontainers/ryuk:0.12.0 is starting: 58bc63fb5b18e128c0d4072152b9522eef2921d0014999e32aa32cdc835bacca
+20:50:58.336 [main] INFO tc.testcontainers/ryuk:0.12.0 -- Container testcontainers/ryuk:0.12.0 started in PT0.879020025S
+20:50:58.342 [main] INFO org.testcontainers.utility.RyukResourceReaper -- Ryuk started - will monitor and terminate Testcontainers containers on JVM exit
+20:50:58.342 [main] INFO org.testcontainers.DockerClientFactory -- Checking the system...
+20:50:58.343 [main] INFO org.testcontainers.DockerClientFactory -- ✔︎ Docker server version should be at least 1.6.0
+20:50:58.343 [main] INFO tc.postgres:15-alpine -- Creating container for image: postgres:15-alpine
+20:50:58.460 [main] INFO tc.postgres:15-alpine -- Container postgres:15-alpine is starting: 5b61eb5194201eb889e7b4bfa2cf78e8295b97c9577aea49820b235c24536621
+20:51:02.578 [main] INFO tc.postgres:15-alpine -- Container postgres:15-alpine started in PT4.23402303S
+20:51:02.579 [main] INFO tc.postgres:15-alpine -- Container is started (JDBC URL: jdbc:postgresql://localhost:32799/hms_db?loggerLevel=OFF)
+20:51:02.594 [main] INFO org.testcontainers.ext.ScriptUtils -- Executing database script from schema.sql
+20:51:02.842 [main] INFO org.testcontainers.ext.ScriptUtils -- Executed database script from schema.sql in 247 ms.
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::               (v3.5.11)
+
+2026-02-23T20:51:03.410+05:30  INFO 1133373 --- [staff-service] [           main] c.hms.staff.StaffServiceIntegrationTest  : Starting StaffServiceIntegrationTest using Java 22.0.2 with PID 1133373 (started by devinda_121260 in /home/devinda_121260/Hospital management project/staff-service)
+2026-02-23T20:51:03.412+05:30  INFO 1133373 --- [staff-service] [           main] c.hms.staff.StaffServiceIntegrationTest  : No active profile set, falling back to 1 default profile: "default"
+2026-02-23T20:51:04.436+05:30  INFO 1133373 --- [staff-service] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-02-23T20:51:04.524+05:30  INFO 1133373 --- [staff-service] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 71 ms. Found 4 JPA repository interfaces.
+Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3
+WARNING: A Java agent has been loaded dynamically (/home/devinda_121260/.m2/repository/net/bytebuddy/byte-buddy-agent/1.17.8/byte-buddy-agent-1.17.8.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+Java HotSpot(TM) 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+2026-02-23T20:51:07.059+05:30  INFO 1133373 --- [staff-service] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-02-23T20:51:07.186+05:30  INFO 1133373 --- [staff-service] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.6.42.Final
+2026-02-23T20:51:07.259+05:30  INFO 1133373 --- [staff-service] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-02-23T20:51:07.511+05:30  INFO 1133373 --- [staff-service] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-02-23T20:51:07.576+05:30  INFO 1133373 --- [staff-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-02-23T20:51:07.733+05:30  INFO 1133373 --- [staff-service] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@5d957cf0
+2026-02-23T20:51:07.735+05:30  INFO 1133373 --- [staff-service] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-02-23T20:51:07.781+05:30  WARN 1133373 --- [staff-service] [           main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-02-23T20:51:07.814+05:30  INFO 1133373 --- [staff-service] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-1)']
+	Database driver: undefined/unknown
+	Database version: 15.16
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-02-23T20:51:09.035+05:30  INFO 1133373 --- [staff-service] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-02-23T20:51:09.118+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    create table staff.departments (
+        id uuid not null,
+        description varchar(255),
+        head_doctor_id uuid,
+        is_active boolean not null,
+        name varchar(255) not null,
+        primary key (id)
+    )
+Hibernate: 
+    create table staff.departments (
+        id uuid not null,
+        description varchar(255),
+        head_doctor_id uuid,
+        is_active boolean not null,
+        name varchar(255) not null,
+        primary key (id)
+    )
+2026-02-23T20:51:09.125+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    create table staff.doctors (
+        id uuid not null,
+        address varchar(255),
+        avatar_url varchar(255),
+        banner_url varchar(255),
+        biography TEXT,
+        city varchar(255),
+        country varchar(255),
+        created_at timestamp(6),
+        date_of_birth date not null,
+        designation varchar(255) not null,
+        education varchar(255) not null,
+        email varchar(255) not null,
+        first_name varchar(255) not null,
+        gender varchar(255) not null,
+        joining_date date,
+        keycloak_user_id varchar(255) not null,
+        last_name varchar(255) not null,
+        mobile varchar(255) not null,
+        postal_code varchar(255),
+        state_province varchar(255),
+        status varchar(255),
+        username varchar(255) not null,
+        department_id uuid not null,
+        primary key (id)
+    )
+Hibernate: 
+    create table staff.doctors (
+        id uuid not null,
+        address varchar(255),
+        avatar_url varchar(255),
+        banner_url varchar(255),
+        biography TEXT,
+        city varchar(255),
+        country varchar(255),
+        created_at timestamp(6),
+        date_of_birth date not null,
+        designation varchar(255) not null,
+        education varchar(255) not null,
+        email varchar(255) not null,
+        first_name varchar(255) not null,
+        gender varchar(255) not null,
+        joining_date date,
+        keycloak_user_id varchar(255) not null,
+        last_name varchar(255) not null,
+        mobile varchar(255) not null,
+        postal_code varchar(255),
+        state_province varchar(255),
+        status varchar(255),
+        username varchar(255) not null,
+        department_id uuid not null,
+        primary key (id)
+    )
+2026-02-23T20:51:09.130+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    create table staff.nurse_allocations (
+        id uuid not null,
+        allocated_at timestamp(6),
+        allocated_by varchar(255),
+        nurse_id uuid not null,
+        nurse_name varchar(255),
+        session_date date not null,
+        status varchar(255),
+        doctor_id uuid not null,
+        primary key (id)
+    )
+Hibernate: 
+    create table staff.nurse_allocations (
+        id uuid not null,
+        allocated_at timestamp(6),
+        allocated_by varchar(255),
+        nurse_id uuid not null,
+        nurse_name varchar(255),
+        session_date date not null,
+        status varchar(255),
+        doctor_id uuid not null,
+        primary key (id)
+    )
+2026-02-23T20:51:09.135+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    create table staff.schedules (
+        id uuid not null,
+        day_of_week integer not null,
+        end_time time(6) not null,
+        is_active boolean not null,
+        max_patients integer not null,
+        slot_duration_minutes integer not null,
+        start_time time(6) not null,
+        doctor_id uuid not null,
+        primary key (id)
+    )
+Hibernate: 
+    create table staff.schedules (
+        id uuid not null,
+        day_of_week integer not null,
+        end_time time(6) not null,
+        is_active boolean not null,
+        max_patients integer not null,
+        slot_duration_minutes integer not null,
+        start_time time(6) not null,
+        doctor_id uuid not null,
+        primary key (id)
+    )
+2026-02-23T20:51:09.139+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    alter table if exists staff.departments 
+       drop constraint if exists UKj6cwks7xecs5jov19ro8ge3qk
+Hibernate: 
+    alter table if exists staff.departments 
+       drop constraint if exists UKj6cwks7xecs5jov19ro8ge3qk
+2026-02-23T20:51:09.142+05:30  WARN 1133373 --- [staff-service] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Warning Code: 0, SQLState: 00000
+2026-02-23T20:51:09.142+05:30  WARN 1133373 --- [staff-service] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : constraint "ukj6cwks7xecs5jov19ro8ge3qk" of relation "departments" does not exist, skipping
+2026-02-23T20:51:09.142+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    alter table if exists staff.departments 
+       add constraint UKj6cwks7xecs5jov19ro8ge3qk unique (name)
+Hibernate: 
+    alter table if exists staff.departments 
+       add constraint UKj6cwks7xecs5jov19ro8ge3qk unique (name)
+2026-02-23T20:51:09.145+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    alter table if exists staff.doctors 
+       drop constraint if exists UKcaifv0va46t2mu85cg5afmayf
+Hibernate: 
+    alter table if exists staff.doctors 
+       drop constraint if exists UKcaifv0va46t2mu85cg5afmayf
+2026-02-23T20:51:09.146+05:30  WARN 1133373 --- [staff-service] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Warning Code: 0, SQLState: 00000
+2026-02-23T20:51:09.147+05:30  WARN 1133373 --- [staff-service] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : constraint "ukcaifv0va46t2mu85cg5afmayf" of relation "doctors" does not exist, skipping
+2026-02-23T20:51:09.147+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    alter table if exists staff.doctors 
+       add constraint UKcaifv0va46t2mu85cg5afmayf unique (email)
+Hibernate: 
+    alter table if exists staff.doctors 
+       add constraint UKcaifv0va46t2mu85cg5afmayf unique (email)
+2026-02-23T20:51:09.149+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    alter table if exists staff.doctors 
+       drop constraint if exists UKjwkuj2fx41u93eep7e0rvd917
+Hibernate: 
+    alter table if exists staff.doctors 
+       drop constraint if exists UKjwkuj2fx41u93eep7e0rvd917
+2026-02-23T20:51:09.150+05:30  WARN 1133373 --- [staff-service] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Warning Code: 0, SQLState: 00000
+2026-02-23T20:51:09.150+05:30  WARN 1133373 --- [staff-service] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : constraint "ukjwkuj2fx41u93eep7e0rvd917" of relation "doctors" does not exist, skipping
+2026-02-23T20:51:09.151+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    alter table if exists staff.doctors 
+       add constraint UKjwkuj2fx41u93eep7e0rvd917 unique (keycloak_user_id)
+Hibernate: 
+    alter table if exists staff.doctors 
+       add constraint UKjwkuj2fx41u93eep7e0rvd917 unique (keycloak_user_id)
+2026-02-23T20:51:09.152+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    alter table if exists staff.doctors 
+       drop constraint if exists UK15xrlsp4drthssb0ns4pghcfk
+Hibernate: 
+    alter table if exists staff.doctors 
+       drop constraint if exists UK15xrlsp4drthssb0ns4pghcfk
+2026-02-23T20:51:09.154+05:30  WARN 1133373 --- [staff-service] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Warning Code: 0, SQLState: 00000
+2026-02-23T20:51:09.154+05:30  WARN 1133373 --- [staff-service] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : constraint "uk15xrlsp4drthssb0ns4pghcfk" of relation "doctors" does not exist, skipping
+2026-02-23T20:51:09.154+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    alter table if exists staff.doctors 
+       add constraint UK15xrlsp4drthssb0ns4pghcfk unique (username)
+Hibernate: 
+    alter table if exists staff.doctors 
+       add constraint UK15xrlsp4drthssb0ns4pghcfk unique (username)
+2026-02-23T20:51:09.173+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    alter table if exists staff.doctors 
+       add constraint FKl2mro81neln9topymd898urh1 
+       foreign key (department_id) 
+       references staff.departments
+Hibernate: 
+    alter table if exists staff.doctors 
+       add constraint FKl2mro81neln9topymd898urh1 
+       foreign key (department_id) 
+       references staff.departments
+2026-02-23T20:51:09.177+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    alter table if exists staff.nurse_allocations 
+       add constraint FK24rvjk8jaq220bq1maopvnb7e 
+       foreign key (doctor_id) 
+       references staff.doctors
+Hibernate: 
+    alter table if exists staff.nurse_allocations 
+       add constraint FK24rvjk8jaq220bq1maopvnb7e 
+       foreign key (doctor_id) 
+       references staff.doctors
+2026-02-23T20:51:09.180+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    alter table if exists staff.schedules 
+       add constraint FKfpyatautb52nts46e1y1y4nvg 
+       foreign key (doctor_id) 
+       references staff.doctors
+Hibernate: 
+    alter table if exists staff.schedules 
+       add constraint FKfpyatautb52nts46e1y1y4nvg 
+       foreign key (doctor_id) 
+       references staff.doctors
+2026-02-23T20:51:09.186+05:30  INFO 1133373 --- [staff-service] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-02-23T20:51:09.650+05:30  INFO 1133373 --- [staff-service] [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-02-23T20:51:11.633+05:30  WARN 1133373 --- [staff-service] [           main] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-02-23T20:51:12.436+05:30  INFO 1133373 --- [staff-service] [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-02-23T20:51:12.437+05:30  INFO 1133373 --- [staff-service] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-02-23T20:51:12.442+05:30  INFO 1133373 --- [staff-service] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 2 ms
+2026-02-23T20:51:12.503+05:30  INFO 1133373 --- [staff-service] [           main] c.hms.staff.StaffServiceIntegrationTest  : Started StaffServiceIntegrationTest in 9.617 seconds (process running for 17.34)
+2026-02-23T20:51:12.871+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    insert 
+    into
+        staff.departments
+        (description, head_doctor_id, is_active, name, id) 
+    values
+        (?, ?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        staff.departments
+        (description, head_doctor_id, is_active, name, id) 
+    values
+        (?, ?, ?, ?, ?)
+2026-02-23T20:51:12.874+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (1:VARCHAR) <- [Heart specialists]
+2026-02-23T20:51:12.875+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (2:UUID) <- [null]
+2026-02-23T20:51:12.875+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (3:BOOLEAN) <- [true]
+2026-02-23T20:51:12.876+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (4:VARCHAR) <- [Cardiology]
+2026-02-23T20:51:12.876+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (5:UUID) <- [2877e4ed-f369-45ee-8e4a-50b0e1e08947]
+2026-02-23T20:51:12.898+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    select
+        count(d1_0.id) 
+    from
+        staff.doctors d1_0 
+    left join
+        staff.departments d2_0 
+            on d2_0.id=d1_0.department_id 
+    where
+        d2_0.id=? 
+        and d1_0.status=?
+Hibernate: 
+    select
+        count(d1_0.id) 
+    from
+        staff.doctors d1_0 
+    left join
+        staff.departments d2_0 
+            on d2_0.id=d1_0.department_id 
+    where
+        d2_0.id=? 
+        and d1_0.status=?
+2026-02-23T20:51:12.899+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (1:UUID) <- [2877e4ed-f369-45ee-8e4a-50b0e1e08947]
+2026-02-23T20:51:12.899+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (2:VARCHAR) <- [active]
+2026-02-23T20:51:13.152+05:30  INFO 1133373 --- [staff-service] [           main] com.hms.staff.service.DoctorService      : Creating doctor profile and Keycloak account for user: dr.jennysmith
+2026-02-23T20:51:13.160+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    select
+        d1_0.id,
+        d1_0.description,
+        d1_0.head_doctor_id,
+        d1_0.is_active,
+        d1_0.name 
+    from
+        staff.departments d1_0 
+    where
+        d1_0.id=?
+Hibernate: 
+    select
+        d1_0.id,
+        d1_0.description,
+        d1_0.head_doctor_id,
+        d1_0.is_active,
+        d1_0.name 
+    from
+        staff.departments d1_0 
+    where
+        d1_0.id=?
+2026-02-23T20:51:13.161+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (1:UUID) <- [2877e4ed-f369-45ee-8e4a-50b0e1e08947]
+2026-02-23T20:51:13.182+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    insert 
+    into
+        staff.doctors
+        (address, avatar_url, banner_url, biography, city, country, created_at, date_of_birth, department_id, designation, education, email, first_name, gender, joining_date, keycloak_user_id, last_name, mobile, postal_code, state_province, status, username, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+Hibernate: 
+    insert 
+    into
+        staff.doctors
+        (address, avatar_url, banner_url, biography, city, country, created_at, date_of_birth, department_id, designation, education, email, first_name, gender, joining_date, keycloak_user_id, last_name, mobile, postal_code, state_province, status, username, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+2026-02-23T20:51:13.183+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (1:VARCHAR) <- [null]
+2026-02-23T20:51:13.183+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (2:VARCHAR) <- [mock-url]
+2026-02-23T20:51:13.183+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (3:VARCHAR) <- [mock-url]
+2026-02-23T20:51:13.183+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (4:VARCHAR) <- [null]
+2026-02-23T20:51:13.184+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (5:VARCHAR) <- [null]
+2026-02-23T20:51:13.184+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (6:VARCHAR) <- [null]
+2026-02-23T20:51:13.184+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (7:TIMESTAMP) <- [2026-02-23T20:51:13.181527]
+2026-02-23T20:51:13.185+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (8:DATE) <- [1985-06-15]
+2026-02-23T20:51:13.186+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (9:UUID) <- [2877e4ed-f369-45ee-8e4a-50b0e1e08947]
+2026-02-23T20:51:13.186+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (10:VARCHAR) <- [Senior Physician]
+2026-02-23T20:51:13.186+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (11:VARCHAR) <- [MBBS, MD]
+2026-02-23T20:51:13.186+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (12:VARCHAR) <- [jenny.smith@hms.com]
+2026-02-23T20:51:13.187+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (13:VARCHAR) <- [Jenny]
+2026-02-23T20:51:13.187+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (14:VARCHAR) <- [female]
+2026-02-23T20:51:13.187+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (15:DATE) <- [2026-02-23]
+2026-02-23T20:51:13.187+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (16:VARCHAR) <- [726f1879-7fa1-4fa8-9ab9-5b2c81f3bc3b]
+2026-02-23T20:51:13.187+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (17:VARCHAR) <- [Smith]
+2026-02-23T20:51:13.187+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (18:VARCHAR) <- [+94771234567]
+2026-02-23T20:51:13.187+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (19:VARCHAR) <- [null]
+2026-02-23T20:51:13.187+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (20:VARCHAR) <- [null]
+2026-02-23T20:51:13.188+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (21:VARCHAR) <- [active]
+2026-02-23T20:51:13.188+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (22:VARCHAR) <- [dr.jennysmith]
+2026-02-23T20:51:13.188+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (23:UUID) <- [bac83e90-4c5a-49f2-91d5-34688a48405b]
+2026-02-23T20:51:13.229+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    select
+        d1_0.id,
+        d1_0.address,
+        d1_0.avatar_url,
+        d1_0.banner_url,
+        d1_0.biography,
+        d1_0.city,
+        d1_0.country,
+        d1_0.created_at,
+        d1_0.date_of_birth,
+        d1_0.department_id,
+        d1_0.designation,
+        d1_0.education,
+        d1_0.email,
+        d1_0.first_name,
+        d1_0.gender,
+        d1_0.joining_date,
+        d1_0.keycloak_user_id,
+        d1_0.last_name,
+        d1_0.mobile,
+        d1_0.postal_code,
+        d1_0.state_province,
+        d1_0.status,
+        d1_0.username 
+    from
+        staff.doctors d1_0 
+    where
+        (
+            ? is null 
+            or d1_0.department_id=?
+        ) 
+        and (
+            ? is null 
+            or d1_0.status=?
+        ) 
+        and (
+            cast(? as varchar) is null 
+            or lower(d1_0.first_name) like lower(('%'||cast(? as varchar)||'%')) escape '' 
+            or lower(d1_0.last_name) like lower(('%'||cast(? as varchar)||'%')) escape '' 
+            or lower(d1_0.designation) like lower(('%'||cast(? as varchar)||'%')) escape ''
+        ) 
+    fetch
+        first ? rows only
+Hibernate: 
+    select
+        d1_0.id,
+        d1_0.address,
+        d1_0.avatar_url,
+        d1_0.banner_url,
+        d1_0.biography,
+        d1_0.city,
+        d1_0.country,
+        d1_0.created_at,
+        d1_0.date_of_birth,
+        d1_0.department_id,
+        d1_0.designation,
+        d1_0.education,
+        d1_0.email,
+        d1_0.first_name,
+        d1_0.gender,
+        d1_0.joining_date,
+        d1_0.keycloak_user_id,
+        d1_0.last_name,
+        d1_0.mobile,
+        d1_0.postal_code,
+        d1_0.state_province,
+        d1_0.status,
+        d1_0.username 
+    from
+        staff.doctors d1_0 
+    where
+        (
+            ? is null 
+            or d1_0.department_id=?
+        ) 
+        and (
+            ? is null 
+            or d1_0.status=?
+        ) 
+        and (
+            cast(? as varchar) is null 
+            or lower(d1_0.first_name) like lower(('%'||cast(? as varchar)||'%')) escape '' 
+            or lower(d1_0.last_name) like lower(('%'||cast(? as varchar)||'%')) escape '' 
+            or lower(d1_0.designation) like lower(('%'||cast(? as varchar)||'%')) escape ''
+        ) 
+    fetch
+        first ? rows only
+2026-02-23T20:51:13.230+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (1:UUID) <- [null]
+2026-02-23T20:51:13.230+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (2:UUID) <- [null]
+2026-02-23T20:51:13.230+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (3:VARCHAR) <- [null]
+2026-02-23T20:51:13.230+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (4:VARCHAR) <- [null]
+2026-02-23T20:51:13.230+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (5:JAVA_OBJECT) <- [null]
+2026-02-23T20:51:13.230+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (6:JAVA_OBJECT) <- [null]
+2026-02-23T20:51:13.230+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (7:JAVA_OBJECT) <- [null]
+2026-02-23T20:51:13.231+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (8:JAVA_OBJECT) <- [null]
+2026-02-23T20:51:13.231+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (9:INTEGER) <- [10]
+2026-02-23T20:51:13.243+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    select
+        d1_0.id,
+        d1_0.description,
+        d1_0.head_doctor_id,
+        d1_0.is_active,
+        d1_0.name 
+    from
+        staff.departments d1_0 
+    where
+        d1_0.id=?
+Hibernate: 
+    select
+        d1_0.id,
+        d1_0.description,
+        d1_0.head_doctor_id,
+        d1_0.is_active,
+        d1_0.name 
+    from
+        staff.departments d1_0 
+    where
+        d1_0.id=?
+2026-02-23T20:51:13.243+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (1:UUID) <- [2877e4ed-f369-45ee-8e4a-50b0e1e08947]
+2026-02-23T20:51:13.273+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    select
+        d1_0.id,
+        d1_0.address,
+        d1_0.avatar_url,
+        d1_0.banner_url,
+        d1_0.biography,
+        d1_0.city,
+        d1_0.country,
+        d1_0.created_at,
+        d1_0.date_of_birth,
+        d1_0.department_id,
+        d1_0.designation,
+        d1_0.education,
+        d1_0.email,
+        d1_0.first_name,
+        d1_0.gender,
+        d1_0.joining_date,
+        d1_0.keycloak_user_id,
+        d1_0.last_name,
+        d1_0.mobile,
+        d1_0.postal_code,
+        d1_0.state_province,
+        d1_0.status,
+        d1_0.username 
+    from
+        staff.doctors d1_0 
+    where
+        d1_0.id=?
+Hibernate: 
+    select
+        d1_0.id,
+        d1_0.address,
+        d1_0.avatar_url,
+        d1_0.banner_url,
+        d1_0.biography,
+        d1_0.city,
+        d1_0.country,
+        d1_0.created_at,
+        d1_0.date_of_birth,
+        d1_0.department_id,
+        d1_0.designation,
+        d1_0.education,
+        d1_0.email,
+        d1_0.first_name,
+        d1_0.gender,
+        d1_0.joining_date,
+        d1_0.keycloak_user_id,
+        d1_0.last_name,
+        d1_0.mobile,
+        d1_0.postal_code,
+        d1_0.state_province,
+        d1_0.status,
+        d1_0.username 
+    from
+        staff.doctors d1_0 
+    where
+        d1_0.id=?
+2026-02-23T20:51:13.274+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (1:UUID) <- [bac83e90-4c5a-49f2-91d5-34688a48405b]
+2026-02-23T20:51:13.278+05:30 DEBUG 1133373 --- [staff-service] [           main] org.hibernate.SQL                        : 
+    select
+        d1_0.id,
+        d1_0.description,
+        d1_0.head_doctor_id,
+        d1_0.is_active,
+        d1_0.name 
+    from
+        staff.departments d1_0 
+    where
+        d1_0.id=?
+Hibernate: 
+    select
+        d1_0.id,
+        d1_0.description,
+        d1_0.head_doctor_id,
+        d1_0.is_active,
+        d1_0.name 
+    from
+        staff.departments d1_0 
+    where
+        d1_0.id=?
+2026-02-23T20:51:13.278+05:30 TRACE 1133373 --- [staff-service] [           main] org.hibernate.orm.jdbc.bind              : binding parameter (1:UUID) <- [2877e4ed-f369-45ee-8e4a-50b0e1e08947]
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 17.75 s -- in com.hms.staff.StaffServiceIntegrationTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  20.941 s
+[INFO] Finished at: 2026-02-23T20:51:14+05:30
+[INFO] ------------------------------------------------------------------------

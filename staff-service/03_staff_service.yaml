@@ -1,0 +1,1059 @@
+openapi: 3.0.3
+info:
+  title: HMS — Staff Service
+  description: |
+    Manages doctors, departments, availability schedules, and nurse allocations.
+    
+    **Important:** Creating a doctor (POST /doctors) also creates a Keycloak user account
+    automatically via the Keycloak Admin API. Deleting a doctor deactivates their Keycloak account.
+    
+    **Auth:** Keycloak JWT required.
+    
+    **Base URL (via gateway):** `http://localhost:3000/staff`
+    **Direct URL:** `http://localhost:3003`
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000/staff
+    description: Via API Gateway
+  - url: http://localhost:3003
+    description: Direct (internal)
+
+tags:
+  - name: Doctors
+    description: Doctor profile management
+  - name: Departments
+    description: Hospital departments
+  - name: Schedules
+    description: Doctor availability schedules
+  - name: Nurse Allocations
+    description: Nurse-to-doctor session allocations
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Doctor:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Also the Keycloak user ID
+        keycloak_user_id:
+          type: string
+          example: "kc-uuid-1234"
+        first_name:
+          type: string
+          example: "Jenny"
+        last_name:
+          type: string
+          example: "Smith"
+        username:
+          type: string
+          example: "dr.jennysmith"
+        email:
+          type: string
+          format: email
+        mobile:
+          type: string
+          example: "+94771234567"
+        date_of_birth:
+          type: string
+          format: date
+        gender:
+          type: string
+          enum: [male, female, other]
+        education:
+          type: string
+          example: "MBBS, MS"
+        designation:
+          type: string
+          example: "Senior Physician"
+        department_id:
+          type: string
+          format: uuid
+        department_name:
+          type: string
+          example: "General Physician"
+        address:
+          type: string
+        city:
+          type: string
+        country:
+          type: string
+        state_province:
+          type: string
+        postal_code:
+          type: string
+        biography:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+          description: Pre-signed MinIO URL
+        banner_url:
+          type: string
+          nullable: true
+          description: Profile banner pre-signed URL
+        status:
+          type: string
+          enum: [active, inactive]
+        joining_date:
+          type: string
+          format: date
+        created_at:
+          type: string
+          format: date-time
+
+    DoctorCreate:
+      type: object
+      required: [first_name, last_name, username, email, mobile, password, date_of_birth, gender, education, designation, department_id]
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        username:
+          type: string
+          example: "dr.jennysmith"
+          description: Keycloak login username — must be unique
+        email:
+          type: string
+          format: email
+        mobile:
+          type: string
+        password:
+          type: string
+          format: password
+          description: Initial Keycloak login password
+        date_of_birth:
+          type: string
+          format: date
+        gender:
+          type: string
+          enum: [male, female, other]
+        education:
+          type: string
+        designation:
+          type: string
+        department_id:
+          type: string
+          format: uuid
+        address:
+          type: string
+        city:
+          type: string
+        country:
+          type: string
+        state_province:
+          type: string
+        postal_code:
+          type: string
+        biography:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+          default: active
+
+    Department:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "General Physician"
+        description:
+          type: string
+          nullable: true
+        head_doctor_id:
+          type: string
+          format: uuid
+          nullable: true
+        head_doctor_name:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+        doctor_count:
+          type: integer
+          example: 5
+
+    Schedule:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        doctor_id:
+          type: string
+          format: uuid
+        day_of_week:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: "0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday"
+          example: 1
+        day_name:
+          type: string
+          example: "Monday"
+        start_time:
+          type: string
+          example: "08:00"
+        end_time:
+          type: string
+          example: "12:00"
+        slot_duration_minutes:
+          type: integer
+          example: 15
+        max_patients:
+          type: integer
+          example: 16
+        is_active:
+          type: boolean
+
+    AvailableSlot:
+      type: object
+      properties:
+        from_time:
+          type: string
+          example: "09:00"
+        to_time:
+          type: string
+          example: "09:15"
+        is_available:
+          type: boolean
+        appointment_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set if slot is already booked
+
+    NurseAllocation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nurse_id:
+          type: string
+          format: uuid
+        nurse_name:
+          type: string
+          example: "Sarah Williams"
+        doctor_id:
+          type: string
+          format: uuid
+        doctor_name:
+          type: string
+          example: "Dr. Jenny Smith"
+        session_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [active, completed, cancelled]
+        allocated_at:
+          type: string
+          format: date-time
+        allocated_by:
+          type: string
+          description: Admin/Receptionist name who made the allocation
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            statusCode:
+              type: integer
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  # ─── DOCTORS ─────────────────────────────────────────────────
+
+  /doctors:
+    get:
+      tags: [Doctors]
+      summary: List all doctors
+      parameters:
+        - name: department_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by name or designation
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Doctor list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Doctor'
+      security:
+        - bearerAuth: []
+
+    post:
+      tags: [Doctors]
+      summary: Create doctor profile + Keycloak account
+      description: |
+        Creates the doctor record in the database AND creates a Keycloak user account.
+        The Keycloak account will have the `doctor` role assigned.
+        The doctor can log in immediately with the provided username and password.
+        
+        Avatar and banner images can be uploaded as multipart.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/DoctorCreate'
+                - type: object
+                  properties:
+                    avatar:
+                      type: string
+                      format: binary
+                      description: Profile photo. Max 5MB. JPEG or PNG.
+                    banner:
+                      type: string
+                      format: binary
+                      description: Profile banner (1084x318px). Max 5MB.
+      responses:
+        "201":
+          description: Doctor created (DB + Keycloak)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Doctor'
+                  message:
+                    type: string
+                    example: "Doctor profile and Keycloak account created. Login: dr.jennysmith"
+        "409":
+          description: Username or email already taken in Keycloak
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+  /doctors/{id}:
+    get:
+      tags: [Doctors]
+      summary: Get doctor profile
+      description: Full doctor profile. Doctors can view their own; admin can view any.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Doctor profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Doctor'
+        "404":
+          description: Doctor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+    put:
+      tags: [Doctors]
+      summary: Update doctor profile
+      description: Admin can update any doctor. Doctor can update own non-sensitive fields (bio, avatar).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                email:
+                  type: string
+                mobile:
+                  type: string
+                education:
+                  type: string
+                designation:
+                  type: string
+                department_id:
+                  type: string
+                  format: uuid
+                address:
+                  type: string
+                city:
+                  type: string
+                country:
+                  type: string
+                biography:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, inactive]
+                avatar:
+                  type: string
+                  format: binary
+                banner:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Doctor updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Doctor'
+      security:
+        - bearerAuth: []
+
+    delete:
+      tags: [Doctors]
+      summary: Deactivate doctor
+      description: |
+        Soft-delete: sets doctor status to inactive AND disables the Keycloak account.
+        The doctor cannot log in after this. Data is preserved for historical records.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Doctor deactivated (DB + Keycloak)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Doctor deactivated. Keycloak account disabled."
+        "404":
+          description: Doctor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+  # ─── DEPARTMENTS ─────────────────────────────────────────────
+
+  /departments:
+    get:
+      tags: [Departments]
+      summary: List all departments
+      description: Available to any authenticated user.
+      responses:
+        "200":
+          description: Department list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Department'
+      security:
+        - bearerAuth: []
+
+    post:
+      tags: [Departments]
+      summary: Create department
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: "Cardiology"
+                description:
+                  type: string
+                head_doctor_id:
+                  type: string
+                  format: uuid
+      responses:
+        "201":
+          description: Department created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Department'
+      security:
+        - bearerAuth: []
+
+  /departments/{id}:
+    put:
+      tags: [Departments]
+      summary: Update department
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                head_doctor_id:
+                  type: string
+                  format: uuid
+                is_active:
+                  type: boolean
+      responses:
+        "200":
+          description: Department updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Department'
+      security:
+        - bearerAuth: []
+
+    delete:
+      tags: [Departments]
+      summary: Delete department
+      description: Cannot delete if active doctors are assigned to this department.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Department deleted
+        "422":
+          description: Cannot delete — active doctors assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+  # ─── SCHEDULES ───────────────────────────────────────────────
+
+  /doctors/{id}/schedule:
+    get:
+      tags: [Schedules]
+      summary: Get doctor schedule
+      description: Returns all active schedule entries for the doctor.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Doctor schedule
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Schedule'
+      security:
+        - bearerAuth: []
+
+    post:
+      tags: [Schedules]
+      summary: Add schedule entry
+      description: Add a new availability slot for the doctor.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [day_of_week, start_time, end_time, slot_duration_minutes, max_patients]
+              properties:
+                day_of_week:
+                  type: integer
+                  minimum: 0
+                  maximum: 6
+                  example: 1
+                  description: "0=Sunday … 6=Saturday"
+                start_time:
+                  type: string
+                  example: "08:00"
+                end_time:
+                  type: string
+                  example: "12:00"
+                slot_duration_minutes:
+                  type: integer
+                  example: 15
+                max_patients:
+                  type: integer
+                  example: 16
+            example:
+              day_of_week: 1
+              start_time: "08:00"
+              end_time: "12:00"
+              slot_duration_minutes: 15
+              max_patients: 16
+      responses:
+        "201":
+          description: Schedule entry added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Schedule'
+      security:
+        - bearerAuth: []
+
+  /schedules/{id}:
+    put:
+      tags: [Schedules]
+      summary: Update schedule entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                start_time:
+                  type: string
+                end_time:
+                  type: string
+                slot_duration_minutes:
+                  type: integer
+                max_patients:
+                  type: integer
+                is_active:
+                  type: boolean
+      responses:
+        "200":
+          description: Schedule updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Schedule'
+      security:
+        - bearerAuth: []
+
+    delete:
+      tags: [Schedules]
+      summary: Remove schedule entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Schedule entry removed
+      security:
+        - bearerAuth: []
+
+  /doctors/{id}/availability:
+    get:
+      tags: [Schedules]
+      summary: Get available slots for a date
+      description: |
+        Returns all time slots for a doctor on a given date based on their schedule,
+        with availability status (some may already be booked).
+        Used by Reception when booking appointments.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2026-02-24"
+      responses:
+        "200":
+          description: Available time slots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      doctor_id:
+                        type: string
+                        format: uuid
+                      doctor_name:
+                        type: string
+                      date:
+                        type: string
+                        format: date
+                      slots:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AvailableSlot'
+        "404":
+          description: Doctor has no schedule for that day
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+
+  # ─── NURSE ALLOCATIONS ───────────────────────────────────────
+
+  /nurse-allocations:
+    get:
+      tags: [Nurse Allocations]
+      summary: List nurse allocations
+      parameters:
+        - name: doctor_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, completed, cancelled]
+      responses:
+        "200":
+          description: Allocation list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NurseAllocation'
+      security:
+        - bearerAuth: []
+
+    post:
+      tags: [Nurse Allocations]
+      summary: Allocate nurse to doctor session
+      description: |
+        Allocates a nurse to a doctor for a session date.
+        Validates that the nurse is not already allocated to another doctor on that date.
+        A nurse can only have one active allocation at a time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nurse_id, doctor_id, session_date]
+              properties:
+                nurse_id:
+                  type: string
+                  format: uuid
+                doctor_id:
+                  type: string
+                  format: uuid
+                session_date:
+                  type: string
+                  format: date
+            example:
+              nurse_id: "uuid-nurse"
+              doctor_id: "uuid-doctor"
+              session_date: "2026-02-21"
+      responses:
+        "201":
+          description: Nurse allocated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/NurseAllocation'
+        "422":
+          description: Nurse already allocated on this date
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                success: false
+                error:
+                  code: "NURSE_ALREADY_ALLOCATED"
+                  message: "Sarah Williams is already allocated to Dr. John Doe on 2026-02-21"
+                  statusCode: 422
+      security:
+        - bearerAuth: []
+
+  /nurse-allocations/{id}/complete:
+    put:
+      tags: [Nurse Allocations]
+      summary: Complete nurse allocation
+      description: |
+        Marks the allocation as complete (session is over).
+        This frees the nurse to be allocated to another doctor.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Allocation completed. Nurse is now free.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/NurseAllocation'
+      security:
+        - bearerAuth: []
+
+  /nurse-allocations/{id}:
+    delete:
+      tags: [Nurse Allocations]
+      summary: Cancel nurse allocation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Allocation cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/NurseAllocation'
+      security:
+        - bearerAuth: []
+
+  /staff/available:
+    get:
+      tags: [Nurse Allocations]
+      summary: Get available staff for allocation
+      description: Returns staff members (nurses) who are not already allocated on the given date.
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [nurse]
+            default: nurse
+      responses:
+        "200":
+          description: Available staff
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        full_name:
+                          type: string
+                        role:
+                          type: string
+                        mobile:
+                          type: string
+      security:
+        - bearerAuth: []

@@ -1,0 +1,57 @@
+server:
+    port: 3003
+
+spring:
+    application:
+        name: staff-service
+
+    datasource:
+        url: jdbc:postgresql://${DB_HOST:localhost}:5432/${DB_NAME:hms_db}
+        username: ${DB_USER:hms_user}
+        password: ${DB_PASS:hms_password}
+        driver-class-name: org.postgresql.Driver
+
+    jpa:
+        hibernate:
+            ddl-auto: update
+        properties:
+            hibernate:
+                "[format_sql]": true
+                "[default_schema]": staff
+        show-sql: true
+        database-platform: org.hibernate.dialect.PostgreSQLDialect
+        defer-datasource-initialization: true
+    sql:
+        init:
+            mode: always
+
+    rabbitmq:
+        host: ${RABBITMQ_HOST:localhost}
+        port: ${RABBITMQ_PORT:5672}
+        username: ${RABBITMQ_USER:guest}
+        password: ${RABBITMQ_PASS:guest}
+
+minio:
+    url: ${MINIO_URL:http://localhost:9000}
+    accessKey: ${MINIO_ACCESS_KEY:minioadmin}
+    secretKey: ${MINIO_SECRET_KEY:minioadmin}
+    buckets:
+        avatars: hms-avatars
+        banners: hms-doctor-banners
+
+keycloak:
+    serverUrl: ${KEYCLOAK_URL:http://localhost:8080}
+    realm: hms
+    clientId: hms-staff-service
+    clientSecret: ${KEYCLOAK_CLIENT_SECRET:your-client-secret}
+    adminUsername: ${KEYCLOAK_ADMIN_USER:admin}
+    adminPassword: ${KEYCLOAK_ADMIN_PASS:admin}
+
+logging:
+    level:
+        org:
+            hibernate:
+                SQL: DEBUG
+                orm:
+                    jdbc:
+                        bind: TRACE
