@@ -1,0 +1,278 @@
+### HMS Finance Service API Collection
+### Port: 3004 | Base URL: http://localhost:3004
+
+@baseUrl = http://localhost:3004
+@keycloakUrl = http://localhost:8080
+@realm = hms
+@clientId = hms-backend
+@clientSecret = your-client-secret
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 0. GET ACCESS TOKEN
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 0. Get Access Token (Keycloak)
+# @name getToken
+POST {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id={{clientId}}&client_secret={{clientSecret}}&username=admin&password=admin
+
+### Auth token (auto-filled after step 0)
+@adminToken = {{getToken.response.body.access_token}}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# INVOICES
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 1. Create Invoice Manually (OPD walk-in billing)
+# @name createInvoice
+POST {{baseUrl}}/invoices
+Authorization: Bearer {{adminToken}}
+X-User-Name: receptionist-alan
+Content-Type: application/json
+
+{
+  "patientId": "a1b2c3d4-0000-0000-0000-111111111111",
+  "patientName": "Andrea Lalema",
+  "billingModule": "opd",
+  "lineItems": [
+    {
+      "itemName": "Doctor Consultation",
+      "itemType": "consultation",
+      "quantity": 1,
+      "unitPrice": 1500.00
+    },
+    {
+      "itemName": "ECG",
+      "itemType": "procedure",
+      "quantity": 1,
+      "unitPrice": 500.00
+    }
+  ],
+  "notes": "Walk-in patient at billing counter"
+}
+
+### Auto-capture invoice ID for subsequent requests
+@invoiceId = {{createInvoice.response.body.data.id}}
+
+### 2. Create Invoice for Pharmacy
+# @name createPharmacyInvoice
+POST {{baseUrl}}/invoices
+Authorization: Bearer {{adminToken}}
+X-User-Name: pharmacist-john
+Content-Type: application/json
+
+{
+  "patientId": "a1b2c3d4-0000-0000-0000-111111111111",
+  "patientName": "Andrea Lalema",
+  "billingModule": "pharmacy",
+  "lineItems": [
+    {
+      "itemName": "Amoxicillin 500mg x10",
+      "itemType": "medicine",
+      "quantity": 2,
+      "unitPrice": 450.00
+    },
+    {
+      "itemName": "Paracetamol 500mg x20",
+      "itemType": "medicine",
+      "quantity": 1,
+      "unitPrice": 180.00
+    }
+  ]
+}
+
+### 3. List All Invoices (paginated)
+GET {{baseUrl}}/invoices?page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### 4. List Invoices — filter by module (OPD only)
+GET {{baseUrl}}/invoices?billing_module=opd&page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### 5. List Invoices — filter by payment status (pending)
+GET {{baseUrl}}/invoices?payment_status=pending&page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### 6. List Invoices — filter by patient
+GET {{baseUrl}}/invoices?patient_id=a1b2c3d4-0000-0000-0000-111111111111&page=1&limit=10
+Authorization: Bearer {{adminToken}}
+
+### 7. List Invoices — filter by date range
+GET {{baseUrl}}/invoices?from=2026-02-01&to=2026-02-28&page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### 8. Get Invoice by ID
+GET {{baseUrl}}/invoices/{{invoiceId}}
+Authorization: Bearer {{adminToken}}
+
+### 9. Apply Percentage Discount to Invoice
+POST {{baseUrl}}/invoices/{{invoiceId}}/discount
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "discountType": "percentage",
+  "discountValue": 10,
+  "reason": "Staff family member"
+}
+
+### 10. Apply Flat Discount to Invoice
+POST {{baseUrl}}/invoices/{{invoiceId}}/discount
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "discountType": "flat",
+  "discountValue": 200.00,
+  "reason": "Senior citizen concession"
+}
+
+### 11. Record Full Payment (cash)
+PUT {{baseUrl}}/invoices/{{invoiceId}}/pay
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "paymentMethod": "cash",
+  "amountPaid": 1800.00,
+  "notes": "Received at billing counter"
+}
+
+### 12. Record Partial Payment (card)
+PUT {{baseUrl}}/invoices/{{invoiceId}}/pay
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "paymentMethod": "card",
+  "amountPaid": 1000.00,
+  "notes": "Partial card payment"
+}
+
+### 13. Record Online Payment
+PUT {{baseUrl}}/invoices/{{invoiceId}}/pay
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "paymentMethod": "online",
+  "amountPaid": 2000.00,
+  "notes": "Paid via mobile banking"
+}
+
+### 14. Get Print-Formatted Invoice Data
+GET {{baseUrl}}/invoices/{{invoiceId}}/print
+Authorization: Bearer {{adminToken}}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PRESCRIPTIONS
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 15. Generate Prescription PDF (for external pharmacy)
+POST {{baseUrl}}/prescriptions/print
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "sessionId": "b2c3d4e5-0000-0000-0000-222222222222",
+  "doctorName": "Dr. Jenny Smith",
+  "hospitalName": "Narammala Channeling Hospital"
+}
+
+### 16. Generate Prescription PDF (minimal — hospital name defaults)
+POST {{baseUrl}}/prescriptions/print
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "sessionId": "b2c3d4e5-0000-0000-0000-333333333333",
+  "doctorName": "Dr. Kumar Perera"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# REPORTS
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 17. Admin Dashboard Summary — this month (default)
+GET {{baseUrl}}/reports/summary
+Authorization: Bearer {{adminToken}}
+
+### 18. Admin Dashboard Summary — today
+GET {{baseUrl}}/reports/summary?period=today
+Authorization: Bearer {{adminToken}}
+
+### 19. Admin Dashboard Summary — this week
+GET {{baseUrl}}/reports/summary?period=this_week
+Authorization: Bearer {{adminToken}}
+
+### 20. Admin Dashboard Summary — this year
+GET {{baseUrl}}/reports/summary?period=this_year
+Authorization: Bearer {{adminToken}}
+
+### 21. Earnings Chart — current year
+GET {{baseUrl}}/reports/earnings
+Authorization: Bearer {{adminToken}}
+
+### 22. Earnings Chart — specific year
+GET {{baseUrl}}/reports/earnings?year=2025
+Authorization: Bearer {{adminToken}}
+
+### 23. Department Statistics — this month
+GET {{baseUrl}}/reports/departments
+Authorization: Bearer {{adminToken}}
+
+### 24. Department Statistics — this year
+GET {{baseUrl}}/reports/departments?period=this_year
+Authorization: Bearer {{adminToken}}
+
+### 25. Department Statistics — all time
+GET {{baseUrl}}/reports/departments?period=all_time
+Authorization: Bearer {{adminToken}}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# VALIDATION / ERROR CASES
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 26. Create Invoice — missing patient_id (expect 400)
+POST {{baseUrl}}/invoices
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "billingModule": "opd",
+  "lineItems": [
+    {
+      "itemName": "Consultation",
+      "itemType": "consultation",
+      "quantity": 1,
+      "unitPrice": 1500.00
+    }
+  ]
+}
+
+### 27. Create Invoice — empty line_items (expect 400)
+POST {{baseUrl}}/invoices
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "patientId": "a1b2c3d4-0000-0000-0000-111111111111",
+  "patientName": "Test Patient",
+  "billingModule": "opd",
+  "lineItems": []
+}
+
+### 28. Pay Invoice — missing amount (expect 400)
+PUT {{baseUrl}}/invoices/{{invoiceId}}/pay
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "paymentMethod": "cash"
+}
+
+### 29. Get Non-existent Invoice (expect 404)
+GET {{baseUrl}}/invoices/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{adminToken}}

@@ -71,7 +71,7 @@ Content-Type: image/jpeg
 ------WebKitFormBoundary7MA4YWxkTrZu0gW--
 
 ### 4. Get All Doctors
-GET {{baseUrl}}/doctors?page=1&limit=10
+ GET {{baseUrl}}/doctors?page=1&limit=10
 Authorization: Bearer {{adminToken}}
 
 ### 5. Get Doctor Profile
