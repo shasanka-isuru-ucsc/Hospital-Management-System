@@ -1,0 +1,16 @@
+# Java / Spring
+target/
+*.jar
+*.class
+*.log
+
+# IDE
+.idea/
+.vscode/
+# build outputs
+**/target/
+*.jar
+*.log
+
+# bundled tools should not be committed
+**/apache-maven-*/
