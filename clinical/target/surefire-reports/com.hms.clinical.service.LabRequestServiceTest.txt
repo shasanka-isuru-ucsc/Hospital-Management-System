@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: com.hms.clinical.service.LabRequestServiceTest
--------------------------------------------------------------------------------
-Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.610 s -- in com.hms.clinical.service.LabRequestServiceTest
