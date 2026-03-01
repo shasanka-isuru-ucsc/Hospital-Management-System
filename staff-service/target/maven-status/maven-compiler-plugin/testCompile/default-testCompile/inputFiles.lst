@@ -1,3 +1,8 @@
-/home/devinda_121260/Hospital management project/staff-service/src/test/java/com/hms/staff/StaffServiceIntegrationTest.java
+/home/devinda_121260/Hospital management project/staff-service/src/test/java/com/hms/staff/StaffServiceApplicationTests.java
+/home/devinda_121260/Hospital management project/staff-service/src/test/java/com/hms/staff/controller/DepartmentControllerTest.java
+/home/devinda_121260/Hospital management project/staff-service/src/test/java/com/hms/staff/controller/DoctorControllerTest.java
+/home/devinda_121260/Hospital management project/staff-service/src/test/java/com/hms/staff/integration/StaffServiceE2ETest.java
+/home/devinda_121260/Hospital management project/staff-service/src/test/java/com/hms/staff/service/DepartmentServiceTest.java
 /home/devinda_121260/Hospital management project/staff-service/src/test/java/com/hms/staff/service/DoctorServiceTest.java
+/home/devinda_121260/Hospital management project/staff-service/src/test/java/com/hms/staff/service/NurseAllocationServiceTest.java
 /home/devinda_121260/Hospital management project/staff-service/src/test/java/com/hms/staff/service/ScheduleServiceTest.java

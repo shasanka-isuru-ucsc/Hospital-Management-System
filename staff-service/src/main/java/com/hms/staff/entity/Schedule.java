@@ -14,29 +14,30 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Schedule {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "doctor_id", nullable = false)
-    private Doctor doctor;
+    @Column(name = "doctor_id", nullable = false)
+    private UUID doctorId;
 
-    @Column(nullable = false)
+    @Column(name = "day_of_week", nullable = false)
     private Integer dayOfWeek; // 0=Sunday, 1=Monday ... 6=Saturday
 
-    @Column(nullable = false)
+    @Column(name = "start_time", nullable = false)
     private LocalTime startTime;
 
-    @Column(nullable = false)
+    @Column(name = "end_time", nullable = false)
     private LocalTime endTime;
 
-    @Column(nullable = false)
+    @Column(name = "slot_duration_minutes", nullable = false)
     private Integer slotDurationMinutes;
 
-    @Column(nullable = false)
+    @Column(name = "max_patients", nullable = false)
     private Integer maxPatients;
 
+    @Column(name = "is_active", nullable = false)
     @Builder.Default
-    private boolean isActive = true;
+    private Boolean isActive = true;
 }

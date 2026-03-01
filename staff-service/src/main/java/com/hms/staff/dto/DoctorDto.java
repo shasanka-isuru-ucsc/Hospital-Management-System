@@ -1,9 +1,12 @@
 package com.hms.staff.dto;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.UUID;
 
 @Data
@@ -34,5 +37,5 @@ public class DoctorDto {
     private String bannerUrl;
     private String status;
     private LocalDate joiningDate;
-    private LocalDateTime createdAt;
+    private ZonedDateTime createdAt;
 }

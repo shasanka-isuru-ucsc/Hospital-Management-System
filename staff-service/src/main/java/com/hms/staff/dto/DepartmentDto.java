@@ -1,6 +1,9 @@
 package com.hms.staff.dto;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
@@ -14,6 +17,6 @@ public class DepartmentDto {
     private String description;
     private UUID headDoctorId;
     private String headDoctorName;
-    private boolean isActive;
+    private Boolean isActive;
     private long doctorCount;
 }

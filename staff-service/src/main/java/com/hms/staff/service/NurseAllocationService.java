@@ -1,14 +1,18 @@
 package com.hms.staff.service;
 
+import com.hms.staff.dto.NurseAllocationCreateRequest;
 import com.hms.staff.dto.NurseAllocationDto;
-import com.hms.staff.dto.StaffAvailableDto;
 import com.hms.staff.entity.Doctor;
 import com.hms.staff.entity.NurseAllocation;
+import com.hms.staff.entity.StaffMember;
 import com.hms.staff.exception.BusinessException;
 import com.hms.staff.exception.ResourceNotFoundException;
 import com.hms.staff.repository.DoctorRepository;
 import com.hms.staff.repository.NurseAllocationRepository;
+import com.hms.staff.repository.StaffMemberRepository;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,86 +22,123 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NurseAllocationService {
 
     private final NurseAllocationRepository nurseAllocationRepository;
+    private final StaffMemberRepository staffMemberRepository;
     private final DoctorRepository doctorRepository;
 
-    public List<NurseAllocationDto> getAllocations(UUID doctorId, LocalDate date, String status) {
-        return nurseAllocationRepository.findAllWithFilters(doctorId, date, status).stream()
-                .map(this::convertToDto)
+    // ─── List Allocations ─────────────────────────────────────────────────────
+
+    public List<NurseAllocationDto> listAllocations(UUID doctorId, LocalDate date, String status) {
+        var spec = (org.springframework.data.jpa.domain.Specification<NurseAllocation>) (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (doctorId != null) predicates.add(cb.equal(root.get("doctorId"), doctorId));
+            if (date != null) predicates.add(cb.equal(root.get("sessionDate"), date));
+            if (status != null) predicates.add(cb.equal(root.get("status"), status));
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return nurseAllocationRepository.findAll(spec).stream()
+                .map(this::toDto)
                 .collect(Collectors.toList());
     }
 
-    @Transactional
-    public NurseAllocationDto allocateNurse(NurseAllocationDto dto) {
-        Doctor doctor = doctorRepository.findById(dto.getDoctorId())
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + dto.getDoctorId()));
+    // ─── Allocate Nurse ───────────────────────────────────────────────────────
 
-        // Validation: Nurse cannot have multiple active allocations on the same day
-        if (nurseAllocationRepository.existsByNurseIdAndSessionDateAndStatus(dto.getNurseId(), dto.getSessionDate(),
-                "active")) {
+    @Transactional
+    public NurseAllocationDto allocateNurse(NurseAllocationCreateRequest request, String allocatedBy) {
+        // Validate nurse exists
+        StaffMember nurse = staffMemberRepository.findById(request.getNurseId())
+                .orElseThrow(() -> new ResourceNotFoundException("Nurse not found: " + request.getNurseId()));
+
+        if (!"nurse".equalsIgnoreCase(nurse.getRole())) {
+            throw new BusinessException("NOT_A_NURSE",
+                    "Staff member '" + nurse.getFullName() + "' is not a nurse", 422);
+        }
+
+        // Validate doctor exists
+        Doctor doctor = doctorRepository.findById(request.getDoctorId())
+                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found: " + request.getDoctorId()));
+
+        // Check nurse not already allocated (active) on this date
+        boolean alreadyAllocated = nurseAllocationRepository.existsByNurseIdAndSessionDateAndStatus(
+                request.getNurseId(), request.getSessionDate(), "active");
+
+        if (alreadyAllocated) {
             throw new BusinessException("NURSE_ALREADY_ALLOCATED",
-                    "Nurse is already allocated to another doctor on " + dto.getSessionDate(), 422);
+                    nurse.getFullName() + " is already allocated to another doctor on "
+                            + request.getSessionDate(), 422);
         }
 
         NurseAllocation allocation = NurseAllocation.builder()
-                .nurseId(dto.getNurseId())
-                .nurseName(dto.getNurseName())
-                .doctor(doctor)
-                .sessionDate(dto.getSessionDate())
+                .nurseId(request.getNurseId())
+                .nurseName(nurse.getFullName())
+                .doctorId(request.getDoctorId())
+                .doctorName("Dr. " + doctor.getFirstName() + " " + doctor.getLastName())
+                .sessionDate(request.getSessionDate())
                 .status("active")
-                .allocatedBy(dto.getAllocatedBy())
+                .allocatedBy(allocatedBy)
                 .build();
 
-        return convertToDto(nurseAllocationRepository.save(allocation));
+        NurseAllocation saved = nurseAllocationRepository.save(allocation);
+        log.info("Allocated nurse {} to doctor {} on {}", nurse.getFullName(),
+                doctor.getLastName(), request.getSessionDate());
+        return toDto(saved);
     }
+
+    // ─── Complete Allocation ──────────────────────────────────────────────────
 
     @Transactional
     public NurseAllocationDto completeAllocation(UUID id) {
         NurseAllocation allocation = nurseAllocationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Allocation not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Allocation not found: " + id));
+
+        if (!"active".equals(allocation.getStatus())) {
+            throw new BusinessException("ALLOCATION_NOT_ACTIVE",
+                    "Allocation is already " + allocation.getStatus(), 422);
+        }
+
         allocation.setStatus("completed");
-        return convertToDto(nurseAllocationRepository.save(allocation));
+        NurseAllocation saved = nurseAllocationRepository.save(allocation);
+        log.info("Completed nurse allocation: {}", id);
+        return toDto(saved);
     }
+
+    // ─── Cancel Allocation ────────────────────────────────────────────────────
 
     @Transactional
-    public void cancelAllocation(UUID id) {
+    public NurseAllocationDto cancelAllocation(UUID id) {
         NurseAllocation allocation = nurseAllocationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Allocation not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Allocation not found: " + id));
+
+        if ("completed".equals(allocation.getStatus())) {
+            throw new BusinessException("ALLOCATION_ALREADY_COMPLETED",
+                    "Cannot cancel a completed allocation", 422);
+        }
+
         allocation.setStatus("cancelled");
-        nurseAllocationRepository.save(allocation);
+        NurseAllocation saved = nurseAllocationRepository.save(allocation);
+        log.info("Cancelled nurse allocation: {}", id);
+        return toDto(saved);
     }
 
-    public List<StaffAvailableDto> getAvailableStaff(LocalDate date, String role) {
-        // In a real system, this would query a central Staff/Employee service.
-        // For now, we return a mock list and filter out those already allocated for the
-        // date.
-        List<StaffAvailableDto> allNurses = new ArrayList<>();
-        allNurses.add(StaffAvailableDto.builder().id(UUID.fromString("617495f3-529a-4712-9c76-2e860953c89f"))
-                .fullName("Sarah Williams").role("nurse").mobile("+94771112233").build());
-        allNurses.add(StaffAvailableDto.builder().id(UUID.fromString("b9c8d7a6-e5f4-3210-fedc-ba9876543210"))
-                .fullName("John Smith").role("nurse").mobile("+94774445566").build());
+    // ─── DTO ──────────────────────────────────────────────────────────────────
 
-        return allNurses.stream()
-                .filter(n -> !nurseAllocationRepository.existsByNurseIdAndSessionDateAndStatus(n.getId(), date,
-                        "active"))
-                .collect(Collectors.toList());
-    }
-
-    private NurseAllocationDto convertToDto(NurseAllocation allocation) {
+    private NurseAllocationDto toDto(NurseAllocation a) {
         return NurseAllocationDto.builder()
-                .id(allocation.getId())
-                .nurseId(allocation.getNurseId())
-                .nurseName(allocation.getNurseName())
-                .doctorId(allocation.getDoctor().getId())
-                .doctorName(allocation.getDoctor().getFirstName() + " " + allocation.getDoctor().getLastName())
-                .sessionDate(allocation.getSessionDate())
-                .status(allocation.getStatus())
-                .allocatedAt(allocation.getAllocatedAt())
-                .allocatedBy(allocation.getAllocatedBy())
+                .id(a.getId())
+                .nurseId(a.getNurseId())
+                .nurseName(a.getNurseName())
+                .doctorId(a.getDoctorId())
+                .doctorName(a.getDoctorName())
+                .sessionDate(a.getSessionDate())
+                .status(a.getStatus())
+                .allocatedAt(a.getAllocatedAt())
+                .allocatedBy(a.getAllocatedBy())
                 .build();
     }
 }

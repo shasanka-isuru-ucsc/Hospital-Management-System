@@ -1,0 +1,524 @@
+### HMS Ward Service API Collection
+### Port: 3006 | Base URL: http://localhost:3006
+### Auth: Bearer token via Keycloak
+
+@baseUrl = http://localhost:3006
+@keycloakUrl = http://localhost:8080
+@realm = hms
+@clientId = hms-backend
+@clientSecret = your-client-secret
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 0. GET ACCESS TOKEN
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 0. Get Access Token (Keycloak)
+# @name getToken
+POST {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id={{clientId}}&client_secret={{clientSecret}}&username=admin&password=admin
+
+### Auth token (auto-filled after step 0)
+@adminToken = {{getToken.response.body.access_token}}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# WARDS
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 1. List All Wards (with occupancy counts)
+GET {{baseUrl}}/wards
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 2. List Active Wards Only
+GET {{baseUrl}}/wards?is_active=true
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 3. Filter Wards by Type (ICU)
+GET {{baseUrl}}/wards?type=icu
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 4. Create Male General Ward
+# @name createMaleWard
+POST {{baseUrl}}/wards
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Male General Ward",
+  "type": "general",
+  "capacity": 20
+}
+
+### Male Ward ID
+@maleWardId = {{createMaleWard.response.body.data.id}}
+
+###
+
+### 5. Create Female General Ward
+# @name createFemaleWard
+POST {{baseUrl}}/wards
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Female General Ward",
+  "type": "general",
+  "capacity": 15
+}
+
+### Female Ward ID
+@femaleWardId = {{createFemaleWard.response.body.data.id}}
+
+###
+
+### 6. Create ICU Ward
+# @name createIcuWard
+POST {{baseUrl}}/wards
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "ICU",
+  "type": "icu",
+  "capacity": 6
+}
+
+###
+
+### 7. Create Private Ward
+POST {{baseUrl}}/wards
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Private Ward",
+  "type": "private",
+  "capacity": 8
+}
+
+###
+
+# ──────────────────────────────────────────────────────────────────────────────
+# BEDS
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 8. List All Beds
+GET {{baseUrl}}/beds
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 9. List Beds in Male General Ward
+GET {{baseUrl}}/beds?ward_id={{maleWardId}}
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 10. List Available Beds Only
+GET {{baseUrl}}/beds?status=available
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 11. List Available Beds in Male Ward
+GET {{baseUrl}}/beds?ward_id={{maleWardId}}&status=available
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 12. Get First Available Bed ID (for testing)
+# Run GET /beds?ward_id={{maleWardId}}&status=available and copy an ID here
+@bedId = 00000000-0000-0000-0000-000000000001
+
+###
+
+### 13. Set Bed to Maintenance
+PUT {{baseUrl}}/beds/{{bedId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "status": "maintenance",
+  "notes": "Bed frame broken — awaiting repair"
+}
+
+###
+
+### 14. Set Bed Back to Available
+PUT {{baseUrl}}/beds/{{bedId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "status": "available"
+}
+
+###
+
+### 15. Set Bed to Reserved
+PUT {{baseUrl}}/beds/{{bedId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "status": "reserved",
+  "notes": "Reserved for expected post-op patient"
+}
+
+###
+
+### 16. Try to Set Bed to Occupied (should fail with 422)
+PUT {{baseUrl}}/beds/{{bedId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "status": "occupied"
+}
+
+###
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ADMISSIONS
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 17. Admit Patient 1 (Andrea Lalema)
+# @name admitPatient1
+# First set the bedId to an available bed from step 11
+POST {{baseUrl}}/admissions
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "patientId": "11111111-1111-1111-1111-111111111111",
+  "patientName": "Andrea Lalema",
+  "patientNumber": "R00001",
+  "bedId": "{{bedId}}",
+  "attendingDoctorId": "22222222-2222-2222-2222-222222222222",
+  "attendingDoctorName": "Dr. Jenny Smith",
+  "admissionReason": "High fever with suspected typhoid — IV treatment required",
+  "notes": "Allergic to Penicillin"
+}
+
+### Admission 1 ID
+@admission1Id = {{admitPatient1.response.body.data.id}}
+
+###
+
+### 18. Try to Admit Same Patient Again (should fail with 422 PATIENT_ALREADY_ADMITTED)
+POST {{baseUrl}}/admissions
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "patientId": "11111111-1111-1111-1111-111111111111",
+  "patientName": "Andrea Lalema",
+  "bedId": "{{bedId}}",
+  "attendingDoctorId": "22222222-2222-2222-2222-222222222222",
+  "admissionReason": "Second attempt — should be rejected"
+}
+
+###
+
+### 19. Admit Patient 2 to a Different Bed
+# @name admitPatient2
+POST {{baseUrl}}/admissions
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "patientId": "33333333-3333-3333-3333-333333333333",
+  "patientName": "John Fernando",
+  "patientNumber": "R00042",
+  "bedId": "00000000-0000-0000-0000-000000000002",
+  "attendingDoctorId": "22222222-2222-2222-2222-222222222222",
+  "attendingDoctorName": "Dr. Jenny Smith",
+  "admissionReason": "Post-operative recovery after appendectomy"
+}
+
+### Admission 2 ID
+@admission2Id = {{admitPatient2.response.body.data.id}}
+
+###
+
+### 20. List All Current Admissions (admitted)
+GET {{baseUrl}}/admissions?status=admitted
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 21. List Admissions by Ward
+GET {{baseUrl}}/admissions?ward_id={{maleWardId}}
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 22. List Admissions by Doctor
+GET {{baseUrl}}/admissions?attending_doctor_id=22222222-2222-2222-2222-222222222222
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 23. List Admissions with Date Range
+GET {{baseUrl}}/admissions?from=2026-01-01&to=2026-12-31
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 24. List Discharged Admissions
+GET {{baseUrl}}/admissions?status=discharged
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 25. Get Admission by ID
+GET {{baseUrl}}/admissions/{{admission1Id}}
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 26. Get Non-Existent Admission (should return 404)
+GET {{baseUrl}}/admissions/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{adminToken}}
+
+###
+
+# ──────────────────────────────────────────────────────────────────────────────
+# WARD SERVICE CHARGES (charge stacking during admission)
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 27. Add Daily Bed Charge (Day 1)
+# @name addBedCharge1
+POST {{baseUrl}}/admissions/{{admission1Id}}/services
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+X-User-Name: ward_staff
+
+{
+  "serviceName": "Daily Bed Charge",
+  "serviceType": "bed_charge",
+  "quantity": 1,
+  "unitPrice": 2500.00,
+  "notes": "Day 1"
+}
+
+### Service ID
+@service1Id = {{addBedCharge1.response.body.data.id}}
+
+###
+
+### 28. Add Medication Charge
+POST {{baseUrl}}/admissions/{{admission1Id}}/services
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+X-User-Name: doctor
+
+{
+  "serviceName": "IV Ceftriaxone 1g",
+  "serviceType": "medication",
+  "quantity": 2,
+  "unitPrice": 450.00,
+  "notes": "Twice daily x 5 days"
+}
+
+###
+
+### 29. Add Another Daily Bed Charge (Day 2)
+POST {{baseUrl}}/admissions/{{admission1Id}}/services
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+X-User-Name: ward_staff
+
+{
+  "serviceName": "Daily Bed Charge",
+  "serviceType": "bed_charge",
+  "quantity": 1,
+  "unitPrice": 2500.00,
+  "notes": "Day 2"
+}
+
+###
+
+### 30. Add Procedure Charge
+POST {{baseUrl}}/admissions/{{admission1Id}}/services
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+X-User-Name: doctor
+
+{
+  "serviceName": "Blood Transfusion",
+  "serviceType": "procedure",
+  "quantity": 1,
+  "unitPrice": 2550.00
+}
+
+###
+
+### 31. Add Investigation Charge
+POST {{baseUrl}}/admissions/{{admission1Id}}/services
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+X-User-Name: ward_staff
+
+{
+  "serviceName": "Full Blood Count",
+  "serviceType": "investigation",
+  "quantity": 1,
+  "unitPrice": 750.00
+}
+
+###
+
+### 32. Add Meal Charge
+POST {{baseUrl}}/admissions/{{admission1Id}}/services
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+X-User-Name: ward_staff
+
+{
+  "serviceName": "Hospital Meals (3 days)",
+  "serviceType": "meal",
+  "quantity": 3,
+  "unitPrice": 500.00
+}
+
+###
+
+### 33. Get All Services for Admission (running total)
+GET {{baseUrl}}/admissions/{{admission1Id}}/services
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 34. Filter Services by Type (medications only)
+GET {{baseUrl}}/admissions/{{admission1Id}}/services?service_type=medication
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 35. Get Admission Detail with Services and Running Total
+GET {{baseUrl}}/admissions/{{admission1Id}}
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 36. Remove a Service Charge (undo incorrect entry)
+DELETE {{baseUrl}}/admissions/{{admission1Id}}/services/{{service1Id}}
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 37. Add Bed Charge Back (replacement)
+POST {{baseUrl}}/admissions/{{admission1Id}}/services
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+X-User-Name: ward_staff
+
+{
+  "serviceName": "Daily Bed Charge",
+  "serviceType": "bed_charge",
+  "quantity": 3,
+  "unitPrice": 2500.00,
+  "notes": "3 days total"
+}
+
+###
+
+### 38. Try to Add Service to Discharged Admission (should fail 422)
+# (Run this after step 39 discharge)
+POST {{baseUrl}}/admissions/{{admission1Id}}/services
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "serviceName": "Post-discharge test",
+  "serviceType": "other",
+  "quantity": 1,
+  "unitPrice": 100.00
+}
+
+###
+
+# ──────────────────────────────────────────────────────────────────────────────
+# DISCHARGE
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 39. Discharge Patient 1 (publishes billing.ward event to Finance)
+PUT {{baseUrl}}/admissions/{{admission1Id}}/discharge
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "dischargeNotes": "Patient recovered well. Discharge with oral antibiotics x 7 days.",
+  "dischargeDiagnosis": "Typhoid Fever — resolved with IV Ceftriaxone"
+}
+
+###
+
+### 40. Verify Bed is Available Again (after discharge)
+GET {{baseUrl}}/beds?ward_id={{maleWardId}}&status=available
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 41. Try to Discharge Again (should fail with ALREADY_DISCHARGED 422)
+PUT {{baseUrl}}/admissions/{{admission1Id}}/discharge
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "dischargeNotes": "Second attempt — should fail"
+}
+
+###
+
+### 42. Get Discharged Admission Details (final_total included)
+GET {{baseUrl}}/admissions/{{admission1Id}}
+Authorization: Bearer {{adminToken}}
+
+###
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PATIENT ADMISSION HISTORY
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 43. Get Patient 1 Full Admission History
+GET {{baseUrl}}/patients/11111111-1111-1111-1111-111111111111/admissions
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 44. Get Patient 1 History — Paginated
+GET {{baseUrl}}/patients/11111111-1111-1111-1111-111111111111/admissions?page=1&limit=5
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 45. Get Patient with No History
+GET {{baseUrl}}/patients/99999999-9999-9999-9999-999999999999/admissions
+Authorization: Bearer {{adminToken}}
+
+###
+
+# ──────────────────────────────────────────────────────────────────────────────
+# WARD OVERVIEW (after discharge — verify counts updated)
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 46. Final Ward Overview — check occupancy updated
+GET {{baseUrl}}/wards
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 47. Discharge Without Body (body is optional)
+PUT {{baseUrl}}/admissions/{{admission2Id}}/discharge
+Authorization: Bearer {{adminToken}}
+
+###

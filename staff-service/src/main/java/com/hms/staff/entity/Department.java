@@ -13,17 +13,21 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Department {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "name", nullable = false, unique = true, length = 150)
     private String name;
 
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "head_doctor_id")
     private UUID headDoctorId;
 
+    @Column(name = "is_active", nullable = false)
     @Builder.Default
-    private boolean isActive = true;
+    private Boolean isActive = true;
 }

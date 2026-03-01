@@ -1,127 +1,474 @@
-### HMS Staff Service API Collection
+### HMS — Staff Service API Collection
+### Base URL: http://localhost:3003 (direct) or http://localhost:3000/staff (via gateway)
 
 @baseUrl = http://localhost:3003
-@keycloakUrl = http://localhost:8080
-@realm = hms
-@clientId = hms-staff-service
-@clientSecret = your-client-secret
+@contentType = application/json
 
-### 0. Get Access Token
-# @name getToken
-POST {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
-Content-Type: application/x-www-form-urlencoded
+# ─── Prerequisites: Create a Department and Staff Member first ─────────────────
+# Run the Department and Staff sections before testing Doctor and Allocation APIs
 
-grant_type=password&client_id={{clientId}}&client_secret={{clientSecret}}&username=admin&password=admin
+# ─── DEPARTMENTS ──────────────────────────────────────────────────────────────
 
-### Token variable (auto-filled after running step 0)
-@adminToken = {{getToken.response.body.access_token}}
+### 1. List all departments
+GET {{baseUrl}}/departments
+Content-Type: {{contentType}}
 
-@doctorId = {{createDoctor.response.body.data.id}}
-@deptId = {{createDepartment.response.body.data.id}}
-@scheduleId = {{addSchedule.response.body.data.id}}
-@allocationId = {{allocateNurse.response.body.data.id}}
+###
 
-### 1. Create a Department
-# @name createDepartment
+### 2. Create department — Cardiology
+# @name createDept
 POST {{baseUrl}}/departments
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
+Content-Type: {{contentType}}
 
 {
   "name": "Cardiology",
-  "description": "Heart and Cardiovascular health specialists"
+  "description": "Heart and cardiovascular care"
 }
 
-### 2. List Departments
-GET {{baseUrl}}/departments
-Authorization: Bearer {{adminToken}}
+###
 
-### 3. Create a Doctor (DB + Keycloak)
-# @name createDoctor
-POST {{baseUrl}}/doctors
-Authorization: Bearer {{adminToken}}
-Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
-
-------WebKitFormBoundary7MA4YWxkTrZu0gW
-Content-Disposition: form-data; name="data"
-Content-Type: application/json
+### 3. Create department — Neurology
+POST {{baseUrl}}/departments
+Content-Type: {{contentType}}
 
 {
-  "firstName": "Jenny",
-  "lastName": "Smith",
-  "username": "dr.jennysmith",
-  "email": "jenny.smith@hms.com",
-  "mobile": "+94771234567",
-  "password": "Password123!",
-  "dateOfBirth": "1985-06-15",
-  "gender": "female",
-  "education": "MBBS, MD",
-  "designation": "Senior Physician",
-  "departmentId": "{{deptId}}",
-  "address": "123 Main St",
-  "city": "Colombo",
-  "country": "Sri Lanka",
-  "biography": "Experienced physician specializing in general medicine."
+  "name": "Neurology",
+  "description": "Brain and nervous system disorders"
 }
-------WebKitFormBoundary7MA4YWxkTrZu0gW
-Content-Disposition: form-data; name="avatar"; filename="avatar.jpg"
-Content-Type: image/jpeg
 
-< ./files/dr-jenny.jpg
-------WebKitFormBoundary7MA4YWxkTrZu0gW--
+###
 
-### 4. Get All Doctors
- GET {{baseUrl}}/doctors?page=1&limit=10
-Authorization: Bearer {{adminToken}}
+### 4. Create department — General Physician
+POST {{baseUrl}}/departments
+Content-Type: {{contentType}}
 
-### 5. Get Doctor Profile
+{
+  "name": "General Physician",
+  "description": "Primary care and general medicine"
+}
+
+###
+
+### 5. Create department — duplicate name (expect 409)
+POST {{baseUrl}}/departments
+Content-Type: {{contentType}}
+
+{
+  "name": "Cardiology"
+}
+
+###
+
+### 6. Update department — set description
+# Replace DEPT_ID with actual department UUID from step 2
+@deptId = DEPT_ID_HERE
+
+PUT {{baseUrl}}/departments/{{deptId}}
+Content-Type: {{contentType}}
+
+{
+  "description": "Updated: Advanced cardiovascular care and interventional cardiology"
+}
+
+###
+
+### 7. Deactivate department
+PUT {{baseUrl}}/departments/{{deptId}}
+Content-Type: {{contentType}}
+
+{
+  "is_active": false
+}
+
+###
+
+### 8. Delete department — fails if active doctors assigned (expect 422)
+DELETE {{baseUrl}}/departments/{{deptId}}
+
+###
+
+# ─── DOCTORS ──────────────────────────────────────────────────────────────────
+# Note: POST /doctors uses multipart/form-data — use cURL or Postman for file uploads.
+# The HTTP file shows the fields; avatar/banner are optional binary parts.
+
+### 9. List all doctors
+GET {{baseUrl}}/doctors
+Content-Type: {{contentType}}
+
+###
+
+### 10. List doctors filtered by department
+GET {{baseUrl}}/doctors?department_id={{deptId}}&status=active
+Content-Type: {{contentType}}
+
+###
+
+### 11. List doctors with search
+GET {{baseUrl}}/doctors?search=jenny&page=1&limit=10
+Content-Type: {{contentType}}
+
+###
+
+### 12. Create doctor (multipart) — use cURL:
+# curl -X POST http://localhost:3003/doctors \
+#   -F "first_name=Jenny" \
+#   -F "last_name=Smith" \
+#   -F "username=dr.jennysmith" \
+#   -F "email=jenny.smith@hospital.com" \
+#   -F "mobile=+94771234567" \
+#   -F "password=Password@123" \
+#   -F "date_of_birth=1985-05-20" \
+#   -F "gender=female" \
+#   -F "education=MBBS, MS" \
+#   -F "designation=Senior Physician" \
+#   -F "department_id=DEPT_ID_HERE" \
+#   -F "biography=Experienced cardiologist with 15 years of practice." \
+#   -F "address=123 Medical St" \
+#   -F "city=Colombo" \
+#   -F "country=Sri Lanka" \
+#   -F "avatar=@/path/to/photo.jpg"
+
+###
+
+### 13. Create second doctor (multipart)
+# curl -X POST http://localhost:3003/doctors \
+#   -F "first_name=John" \
+#   -F "last_name=Doe" \
+#   -F "username=dr.johndoe" \
+#   -F "email=john.doe@hospital.com" \
+#   -F "mobile=+94770000001" \
+#   -F "password=Password@123" \
+#   -F "date_of_birth=1978-08-15" \
+#   -F "gender=male" \
+#   -F "education=MBBS, MD" \
+#   -F "designation=Consultant Physician" \
+#   -F "department_id=DEPT_ID_HERE"
+
+###
+
+### 14. Get doctor by ID
+# Replace DOCTOR_ID with actual doctor UUID
+@doctorId = DOCTOR_ID_HERE
+
 GET {{baseUrl}}/doctors/{{doctorId}}
-Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
 
-### 6. Add Doctor Schedule
-# @name addSchedule
+###
+
+### 15. Get doctor — not found (expect 404)
+GET {{baseUrl}}/doctors/00000000-0000-0000-0000-000000000000
+Content-Type: {{contentType}}
+
+###
+
+### 16. Update doctor (multipart) — use cURL:
+# curl -X PUT http://localhost:3003/doctors/DOCTOR_ID \
+#   -F "designation=Chief Cardiologist" \
+#   -F "biography=Updated biography text"
+
+###
+
+### 17. Deactivate doctor (soft-delete + Keycloak disable)
+DELETE {{baseUrl}}/doctors/{{doctorId}}
+Content-Type: {{contentType}}
+
+###
+
+# ─── SCHEDULES ────────────────────────────────────────────────────────────────
+# Reset doctorId to an active doctor before running these
+
+### 18. Add Monday schedule (08:00–12:00, 15-min slots)
 POST {{baseUrl}}/doctors/{{doctorId}}/schedule
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
+Content-Type: {{contentType}}
 
 {
-  "dayOfWeek": 1,
-  "startTime": "08:00",
-  "endTime": "12:00",
-  "slotDurationMinutes": 15,
-  "maxPatients": 16
+  "day_of_week": 1,
+  "start_time": "08:00",
+  "end_time": "12:00",
+  "slot_duration_minutes": 15,
+  "max_patients": 16
 }
 
-### 7. Get Doctor Schedule
+###
+
+### 19. Add Wednesday schedule (14:00–17:00, 20-min slots)
+POST {{baseUrl}}/doctors/{{doctorId}}/schedule
+Content-Type: {{contentType}}
+
+{
+  "day_of_week": 3,
+  "start_time": "14:00",
+  "end_time": "17:00",
+  "slot_duration_minutes": 20,
+  "max_patients": 9
+}
+
+###
+
+### 20. Add Friday schedule (09:00–13:00, 30-min slots)
+POST {{baseUrl}}/doctors/{{doctorId}}/schedule
+Content-Type: {{contentType}}
+
+{
+  "day_of_week": 5,
+  "start_time": "09:00",
+  "end_time": "13:00",
+  "slot_duration_minutes": 30,
+  "max_patients": 8
+}
+
+###
+
+### 21. Add schedule — invalid time range (expect 400)
+POST {{baseUrl}}/doctors/{{doctorId}}/schedule
+Content-Type: {{contentType}}
+
+{
+  "day_of_week": 2,
+  "start_time": "12:00",
+  "end_time": "08:00",
+  "slot_duration_minutes": 15,
+  "max_patients": 10
+}
+
+###
+
+### 22. Get doctor schedule
 GET {{baseUrl}}/doctors/{{doctorId}}/schedule
-Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
 
-### 8. Get Availability Slots
+###
+
+### 23. Get availability — Monday March 2, 2026 (16 slots for 15-min session)
 GET {{baseUrl}}/doctors/{{doctorId}}/availability?date=2026-03-02
-Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
 
-### 9. Allocate Nurse to Session
+###
+
+### 24. Get availability — Wednesday March 4, 2026
+GET {{baseUrl}}/doctors/{{doctorId}}/availability?date=2026-03-04
+Content-Type: {{contentType}}
+
+###
+
+### 25. Get availability — no schedule day (Tuesday, expect 404)
+GET {{baseUrl}}/doctors/{{doctorId}}/availability?date=2026-03-03
+Content-Type: {{contentType}}
+
+###
+
+### 26. Update schedule entry
+# Replace SCHEDULE_ID with UUID from step 18
+@scheduleId = SCHEDULE_ID_HERE
+
+PUT {{baseUrl}}/schedules/{{scheduleId}}
+Content-Type: {{contentType}}
+
+{
+  "max_patients": 20,
+  "slot_duration_minutes": 10
+}
+
+###
+
+### 27. Deactivate a schedule entry
+PUT {{baseUrl}}/schedules/{{scheduleId}}
+Content-Type: {{contentType}}
+
+{
+  "is_active": false
+}
+
+###
+
+### 28. Delete schedule entry
+DELETE {{baseUrl}}/schedules/{{scheduleId}}
+
+###
+
+# ─── STAFF MEMBERS (Nurses) ───────────────────────────────────────────────────
+
+### 29. Create nurse — Sarah Williams
+# @name createNurse
+POST {{baseUrl}}/staff
+Content-Type: {{contentType}}
+
+{
+  "full_name": "Sarah Williams",
+  "role": "nurse",
+  "email": "sarah.williams@hospital.com",
+  "mobile": "+94779876543",
+  "status": "active"
+}
+
+###
+
+### 30. Create nurse — Michael Chen
+POST {{baseUrl}}/staff
+Content-Type: {{contentType}}
+
+{
+  "full_name": "Michael Chen",
+  "role": "nurse",
+  "email": "michael.chen@hospital.com",
+  "mobile": "+94778765432"
+}
+
+###
+
+### 31. Create receptionist staff member
+POST {{baseUrl}}/staff
+Content-Type: {{contentType}}
+
+{
+  "full_name": "Alice Johnson",
+  "role": "receptionist",
+  "email": "alice@hospital.com",
+  "mobile": "+94775555000"
+}
+
+###
+
+### 32. List all staff members
+GET {{baseUrl}}/staff
+Content-Type: {{contentType}}
+
+###
+
+### 33. Get staff member by ID
+# Replace NURSE_ID with UUID from step 29
+@nurseId = NURSE_ID_HERE
+
+GET {{baseUrl}}/staff/{{nurseId}}
+Content-Type: {{contentType}}
+
+###
+
+### 34. Get available nurses on a date (both Sarah and Michael should appear)
+GET {{baseUrl}}/staff/available?date=2026-03-10&role=nurse
+Content-Type: {{contentType}}
+
+###
+
+# ─── NURSE ALLOCATIONS ────────────────────────────────────────────────────────
+
+### 35. List all allocations
+GET {{baseUrl}}/nurse-allocations
+Content-Type: {{contentType}}
+
+###
+
+### 36. Allocate Sarah to doctor on March 10
 # @name allocateNurse
 POST {{baseUrl}}/nurse-allocations
-Authorization: Bearer {{adminToken}}
-Content-Type: application/json
+Content-Type: {{contentType}}
+X-User-Name: admin
 
 {
-  "nurseId": "617495f3-529a-4712-9c76-2e860953c89f",
-  "nurseName": "Sarah Williams",
-  "doctorId": "{{doctorId}}",
-  "sessionDate": "2026-03-02",
-  "allocatedBy": "Receptionist Alan"
+  "nurse_id": "NURSE_ID_HERE",
+  "doctor_id": "DOCTOR_ID_HERE",
+  "session_date": "2026-03-10"
 }
 
-### 10. List Allocations
-GET {{baseUrl}}/nurse-allocations?date=2026-03-02
-Authorization: Bearer {{adminToken}}
+###
 
-### 11. Complete Allocation
+### 37. Allocate same nurse again on same date (expect 422 NURSE_ALREADY_ALLOCATED)
+POST {{baseUrl}}/nurse-allocations
+Content-Type: {{contentType}}
+
+{
+  "nurse_id": "NURSE_ID_HERE",
+  "doctor_id": "DOCTOR_ID_HERE",
+  "session_date": "2026-03-10"
+}
+
+###
+
+### 38. Get available nurses — Sarah should be gone (allocated on March 10)
+GET {{baseUrl}}/staff/available?date=2026-03-10&role=nurse
+Content-Type: {{contentType}}
+
+###
+
+### 39. Allocate Michael to same doctor on a different date (allowed)
+POST {{baseUrl}}/nurse-allocations
+Content-Type: {{contentType}}
+X-User-Name: receptionist1
+
+{
+  "nurse_id": "MICHAEL_ID_HERE",
+  "doctor_id": "DOCTOR_ID_HERE",
+  "session_date": "2026-03-12"
+}
+
+###
+
+### 40. Filter allocations by doctor
+GET {{baseUrl}}/nurse-allocations?doctor_id={{doctorId}}&status=active
+Content-Type: {{contentType}}
+
+###
+
+### 41. Filter allocations by date
+GET {{baseUrl}}/nurse-allocations?date=2026-03-10
+Content-Type: {{contentType}}
+
+###
+
+### 42. Complete an allocation
+# Replace ALLOCATION_ID with UUID from step 36
+@allocationId = ALLOCATION_ID_HERE
+
 PUT {{baseUrl}}/nurse-allocations/{{allocationId}}/complete
-Authorization: Bearer {{adminToken}}
+Content-Type: {{contentType}}
 
-### 12. Deactivate Doctor
-DELETE {{baseUrl}}/doctors/{{doctorId}}
-Authorization: Bearer {{adminToken}}
+###
+
+### 43. Complete already completed (expect 422)
+PUT {{baseUrl}}/nurse-allocations/{{allocationId}}/complete
+Content-Type: {{contentType}}
+
+###
+
+### 44. Get available nurses — Sarah is free again after completion
+GET {{baseUrl}}/staff/available?date=2026-03-10&role=nurse
+Content-Type: {{contentType}}
+
+###
+
+### 45. Allocate nurse to non-existent doctor (expect 404)
+POST {{baseUrl}}/nurse-allocations
+Content-Type: {{contentType}}
+
+{
+  "nurse_id": "NURSE_ID_HERE",
+  "doctor_id": "00000000-0000-0000-0000-000000000000",
+  "session_date": "2026-03-15"
+}
+
+###
+
+### 46. Cancel an allocation
+DELETE {{baseUrl}}/nurse-allocations/{{allocationId}}
+Content-Type: {{contentType}}
+
+###
+
+### 47. Cancel already completed allocation (expect 422)
+DELETE {{baseUrl}}/nurse-allocations/{{allocationId}}
+Content-Type: {{contentType}}
+
+###
+
+# ─── FULL WORKFLOW SUMMARY ────────────────────────────────────────────────────
+# 1. POST /departments          → Create Cardiology dept
+# 2. POST /doctors (multipart)  → Create Dr. Jenny Smith + Keycloak account
+# 3. POST /doctors/{id}/schedule → Add Monday 08:00-12:00 schedule
+# 4. GET  /doctors/{id}/availability?date=2026-03-02 → See 16 slots
+# 5. POST /staff                → Create nurse Sarah Williams
+# 6. GET  /staff/available?date=2026-03-10 → Sarah is free
+# 7. POST /nurse-allocations    → Allocate Sarah to Jenny on March 10
+# 8. GET  /staff/available?date=2026-03-10 → Sarah no longer listed
+# 9. PUT  /nurse-allocations/{id}/complete → Session done, Sarah freed
+# 10. DELETE /doctors/{id}      → Deactivates doctor + Keycloak account
+###

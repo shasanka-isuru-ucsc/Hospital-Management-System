@@ -1,0 +1,495 @@
+### HMS Lab Service API Collection
+### Port: 3005 | Base URL: http://localhost:3005
+
+@baseUrl = http://localhost:3005
+@keycloakUrl = http://localhost:8080
+@realm = hms
+@clientId = hms-backend
+@clientSecret = your-client-secret
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 0. GET ACCESS TOKEN
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 0. Get Access Token (Keycloak)
+# @name getToken
+POST {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id={{clientId}}&client_secret={{clientSecret}}&username=admin&password=admin
+
+### Auth token (auto-filled after step 0)
+@adminToken = {{getToken.response.body.access_token}}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TEST CATALOG
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 1. Get Test Catalog (all active tests)
+GET {{baseUrl}}/tests
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 2. Get Test Catalog — filter by category
+GET {{baseUrl}}/tests?category=Haematology
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 3. Get Test Catalog — search by name or code
+GET {{baseUrl}}/tests?search=blood
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 4. Get All Tests (including inactive)
+GET {{baseUrl}}/tests?is_active=false
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 5. Add Test to Catalog (CBC)
+# @name addTestCBC
+POST {{baseUrl}}/tests
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Complete Blood Count",
+  "code": "CBC",
+  "category": "Haematology",
+  "unitPrice": 750.00,
+  "turnaroundHours": 4,
+  "referenceRange": "WBC: 4.5-11.0 x10³/μL, RBC: 4.5-5.5 x10⁶/μL, Hgb: 12-17 g/dL"
+}
+
+### CBC Test ID (auto-filled after step 5)
+@cbcTestId = {{addTestCBC.response.body.data.id}}
+
+###
+
+### 6. Add Test to Catalog (Widal)
+# @name addTestWidal
+POST {{baseUrl}}/tests
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Widal Test",
+  "code": "WIDAL",
+  "category": "Microbiology",
+  "unitPrice": 500.00,
+  "turnaroundHours": 24,
+  "referenceRange": "Negative < 1:80 titre"
+}
+
+### Widal Test ID (auto-filled after step 6)
+@widalTestId = {{addTestWidal.response.body.data.id}}
+
+###
+
+### 7. Add Test to Catalog (Fasting Blood Sugar)
+# @name addTestFBS
+POST {{baseUrl}}/tests
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Fasting Blood Sugar",
+  "code": "FBS",
+  "category": "Biochemistry",
+  "unitPrice": 350.00,
+  "turnaroundHours": 2,
+  "referenceRange": "70–99 mg/dL (normal), 100–125 mg/dL (pre-diabetic)"
+}
+
+### FBS Test ID (auto-filled after step 7)
+@fbsTestId = {{addTestFBS.response.body.data.id}}
+
+###
+
+### 8. Update Test Price
+PUT {{baseUrl}}/tests/{{cbcTestId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "unitPrice": 800.00,
+  "turnaroundHours": 3
+}
+
+###
+
+### 9. Deactivate a Test (soft delete)
+DELETE {{baseUrl}}/tests/{{fbsTestId}}
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 10. Add Test — expect 409 duplicate code
+POST {{baseUrl}}/tests
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Complete Blood Count 2",
+  "code": "CBC",
+  "unitPrice": 700.00
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# LAB ORDERS — WALK-IN
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 11. Register Walk-In Lab Order (two tests)
+# @name createOrder
+POST {{baseUrl}}/orders
+Authorization: Bearer {{adminToken}}
+X-User-Name: lab-tech-priya
+Content-Type: application/json
+
+{
+  "patientName": "Andrea Lalema",
+  "patientMobile": "+94771234567",
+  "source": "walk_in",
+  "tests": [
+    {
+      "testId": "{{cbcTestId}}",
+      "urgency": "routine"
+    },
+    {
+      "testId": "{{widalTestId}}",
+      "urgency": "urgent"
+    }
+  ],
+  "notes": "Patient reports 4 days of fever and headache"
+}
+
+### Order ID (auto-filled after step 11)
+@orderId = {{createOrder.response.body.data.id}}
+@orderTestId1 = {{createOrder.response.body.data.tests[0].id}}
+@orderTestId2 = {{createOrder.response.body.data.tests[1].id}}
+
+###
+
+### 12. Register Walk-In Order — with patient ID (registered patient)
+# @name createOrderWithPatientId
+POST {{baseUrl}}/orders
+Authorization: Bearer {{adminToken}}
+X-User-Name: lab-tech-priya
+Content-Type: application/json
+
+{
+  "patientId": "a1b2c3d4-0000-0000-0000-111111111111",
+  "patientName": "Nimal Perera",
+  "patientMobile": "+94779876543",
+  "source": "walk_in",
+  "tests": [
+    {
+      "testId": "{{cbcTestId}}",
+      "urgency": "routine"
+    }
+  ]
+}
+
+###
+
+### 13. Register Order — expect 400 missing patient info
+POST {{baseUrl}}/orders
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "source": "walk_in",
+  "tests": [
+    {
+      "testId": "{{cbcTestId}}"
+    }
+  ]
+}
+
+###
+
+### 14. Register Order — expect 400 empty tests
+POST {{baseUrl}}/orders
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "patientName": "Andrea Lalema",
+  "tests": []
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# LAB ORDERS — LIST & GET
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 15. List All Orders
+GET {{baseUrl}}/orders
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 16. List Orders — filter by status=registered
+GET {{baseUrl}}/orders?status=registered
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 17. List Orders — filter by payment_status=pending
+GET {{baseUrl}}/orders?payment_status=pending
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 18. List Orders — filter by source=walk_in
+GET {{baseUrl}}/orders?source=walk_in
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 19. List Orders — filter by date (today)
+GET {{baseUrl}}/orders?date=2026-02-28
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 20. List Orders — paginated
+GET {{baseUrl}}/orders?page=1&limit=10
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 21. Get Order by ID
+GET {{baseUrl}}/orders/{{orderId}}
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 22. Get Order — expect 404 not found
+GET {{baseUrl}}/orders/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{adminToken}}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# LAB RESULTS ENTRY
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 23. Enter Results — partial (first test only, status → processing)
+PUT {{baseUrl}}/orders/{{orderId}}/results
+Authorization: Bearer {{adminToken}}
+X-User-Name: lab-tech-priya
+Content-Type: application/json
+
+{
+  "results": [
+    {
+      "orderTestId": "{{orderTestId1}}",
+      "resultValue": "WBC: 9.2 x10³/μL, RBC: 4.8 x10⁶/μL, Hgb: 13.5 g/dL, Plt: 250 x10³/μL",
+      "isAbnormal": false,
+      "technicianNotes": "All values within normal range"
+    }
+  ]
+}
+
+###
+
+### 24. Enter Results — complete second test (status → completed)
+PUT {{baseUrl}}/orders/{{orderId}}/results
+Authorization: Bearer {{adminToken}}
+X-User-Name: lab-tech-priya
+Content-Type: application/json
+
+{
+  "results": [
+    {
+      "orderTestId": "{{orderTestId2}}",
+      "resultValue": "S.Typhi O: 1:160, S.Typhi H: 1:320, S.Paratyphi A: Negative",
+      "isAbnormal": true,
+      "technicianNotes": "Significant titre — clinical correlation recommended"
+    }
+  ]
+}
+
+###
+
+### 25. Enter Results — expect 422 order already completed
+PUT {{baseUrl}}/orders/{{orderId}}/results
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "results": [
+    {
+      "orderTestId": "{{orderTestId1}}",
+      "resultValue": "Re-run"
+    }
+  ]
+}
+
+###
+
+### 26. Enter Results — expect 400 empty results
+PUT {{baseUrl}}/orders/{{orderId}}/results
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "results": []
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# REPORT UPLOAD
+# (Use curl or Postman — multipart not supported in .http for binary files)
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 27. Upload Report PDF — multipart/form-data
+# Use curl command below for binary file upload:
+#
+# curl -X POST http://localhost:3005/orders/{{orderId}}/report \
+#   -H "Authorization: Bearer <token>" \
+#   -F "report=@/path/to/lab-report.pdf;type=application/pdf" \
+#   -F "notes=Results suggest typhoid. Recommend treatment."
+
+###
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PAYMENT
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 28. Record Payment — cash
+PUT {{baseUrl}}/orders/{{orderId}}/pay
+Authorization: Bearer {{adminToken}}
+X-User-Name: lab-tech-priya
+Content-Type: application/json
+
+{
+  "paymentMethod": "cash",
+  "amountPaid": 1250.00
+}
+
+###
+
+### 29. Record Payment — card
+# @name payOrderCard
+POST {{baseUrl}}/orders
+Authorization: Bearer {{adminToken}}
+X-User-Name: lab-tech-priya
+Content-Type: application/json
+
+{
+  "patientName": "Kamal Silva",
+  "source": "walk_in",
+  "tests": [
+    {
+      "testId": "{{cbcTestId}}",
+      "urgency": "routine"
+    }
+  ]
+}
+
+@cardOrderId = {{payOrderCard.response.body.data.id}}
+
+###
+
+PUT {{baseUrl}}/orders/{{cardOrderId}}/pay
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "paymentMethod": "card",
+  "amountPaid": 750.00
+}
+
+###
+
+### 30. Record Payment — expect 422 already paid
+PUT {{baseUrl}}/orders/{{orderId}}/pay
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "paymentMethod": "cash",
+  "amountPaid": 1250.00
+}
+
+###
+
+### 31. Record Payment — expect 400 missing method
+PUT {{baseUrl}}/orders/{{orderId}}/pay
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "amountPaid": 1250.00
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PATIENT LAB HISTORY
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 32. Get Patient Lab History
+GET {{baseUrl}}/patients/a1b2c3d4-0000-0000-0000-111111111111/history
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 33. Get Patient Lab History — date range filter
+GET {{baseUrl}}/patients/a1b2c3d4-0000-0000-0000-111111111111/history?from=2026-01-01&to=2026-02-28
+Authorization: Bearer {{adminToken}}
+
+###
+
+### 34. Get Patient Lab History — paginated
+GET {{baseUrl}}/patients/a1b2c3d4-0000-0000-0000-111111111111/history?page=1&limit=5
+Authorization: Bearer {{adminToken}}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CLINICAL_REQUEST ORDER (simulating RabbitMQ event via manual API call)
+# In production this is auto-created when clinical service publishes lab.requested
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 35. Create Clinical Request Order (manual simulation)
+# @name createClinicalOrder
+POST {{baseUrl}}/orders
+Authorization: Bearer {{adminToken}}
+X-User-Name: system
+Content-Type: application/json
+
+{
+  "patientId": "a1b2c3d4-0000-0000-0000-111111111111",
+  "patientName": "Andrea Lalema",
+  "sessionId": "s1e2s3s4-0000-0000-0000-000000000001",
+  "source": "clinical_request",
+  "tests": [
+    {
+      "testId": "{{cbcTestId}}",
+      "urgency": "urgent"
+    },
+    {
+      "testId": "{{widalTestId}}",
+      "urgency": "routine"
+    }
+  ],
+  "notes": "Referred by Dr. Rajapaksha — suspected typhoid"
+}
+
+@clinicalOrderId = {{createClinicalOrder.response.body.data.id}}
+
+###
+
+### 36. Create Clinical Request Order — expect 409 duplicate session
+POST {{baseUrl}}/orders
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "patientName": "Andrea Lalema",
+  "sessionId": "s1e2s3s4-0000-0000-0000-000000000001",
+  "source": "clinical_request",
+  "tests": [
+    {
+      "testId": "{{cbcTestId}}"
+    }
+  ]
+}
