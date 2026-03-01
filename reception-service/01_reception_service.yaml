@@ -559,7 +559,7 @@ paths:
       summary: Issue a queue token
       description: |
         Issues a queue token for a patient. Token numbers reset daily per queue type.
-        On creation, publishes a `queue.updated` event to RabbitMQ, which the API Gateway
+        On creation, publishes a `queue.updated` event to NATS, which the API Gateway
         bridges to connected Queue Display boards via WebSocket.
       requestBody:
         required: true
@@ -645,7 +645,7 @@ paths:
         - Doctor starts: called → in_progress  
         - Doctor finishes: in_progress → completed
 
-        Every status change publishes a `queue.updated` RabbitMQ fanout event,
+        Every status change publishes a `queue.updated` NATS fanout event,
         which instantly refreshes all Queue Display boards via WebSocket.
       parameters:
         - name: id

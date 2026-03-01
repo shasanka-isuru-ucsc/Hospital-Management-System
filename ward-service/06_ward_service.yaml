@@ -5,7 +5,7 @@ info:
     Manages the admission ward: bed availability, patient admissions, daily service/charge
     stacking, and patient discharge with automatic billing.
     
-    On discharge, publishes a `billing.ward` event to RabbitMQ. Finance Service picks this
+    On discharge, publishes a `billing.ward` event to NATS. Finance Service picks this
     up and closes the ward admission invoice automatically.
     
     **Auth:** Keycloak JWT required.
@@ -13,7 +13,7 @@ info:
     **Base URL (via gateway):** `http://localhost:3000/ward`
     **Direct URL:** `http://localhost:3006`
     
-    **RabbitMQ events published:**
+    **NATS events published:**
     - `billing.ward` → on `PUT /admissions/:id/discharge` → Finance Service creates ward invoice
   version: 1.0.0
 
@@ -644,7 +644,7 @@ paths:
         1. Admission status set to `discharged`, `discharged_at` set to now
         2. Bed status set back to `available`
         3. All ward services fetched and total computed
-        4. `billing.ward` event published to RabbitMQ:
+        4. `billing.ward` event published to NATS:
         
         ```json
         {

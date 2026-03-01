@@ -18,19 +18,16 @@ spring:
         "[default_schema]": lab
     show-sql: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
-    defer-datasource-initialization: true
   sql:
     init:
       mode: always
-  rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USER:guest}
-    password: ${RABBITMQ_PASS:guest}
   servlet:
     multipart:
       max-file-size: 20MB
       max-request-size: 20MB
+
+nats:
+  url: ${NATS_URL:nats://localhost:4222}
 
 minio:
   url: ${MINIO_URL:http://localhost:9000}

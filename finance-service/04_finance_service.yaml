@@ -3,14 +3,14 @@ info:
   title: HMS — Finance Service
   description: |
     Handles all billing across every module. Invoices are created automatically via
-    RabbitMQ events (from Clinical, Ward, Lab services) or manually at the billing counter.
+    NATS events (from Clinical, Ward, Lab services) or manually at the billing counter.
     
     **Auth:** Keycloak JWT required.
     
     **Base URL (via gateway):** `http://localhost:3000/finance`
     **Direct URL:** `http://localhost:3004`
     
-    **RabbitMQ events consumed by this service:**
+    **NATS events consumed by this service:**
     - `billing.opd` → auto-creates OPD consultation invoice
     - `billing.wound` → auto-creates wound care invoice
     - `billing.ward` → creates/closes ward admission invoice on discharge
@@ -116,7 +116,7 @@ components:
         source:
           type: string
           enum: [event, manual]
-          description: "'event' = auto-created from RabbitMQ; 'manual' = created at billing counter"
+          description: "'event' = auto-created from NATS; 'manual' = created at billing counter"
         paid_at:
           type: string
           format: date-time
@@ -331,7 +331,7 @@ paths:
         Manually create an invoice at the billing counter (walk-in billing).
         
         Most invoices are auto-created by the Finance Service when it receives
-        RabbitMQ events from other services. Use this endpoint only for walk-in 
+        NATS events from other services. Use this endpoint only for walk-in 
         or manually-entered billing scenarios.
       requestBody:
         required: true

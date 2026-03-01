@@ -1,13 +1,14 @@
 package com.hms.ward.event;
 
-import com.hms.ward.config.RabbitMQConfig;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hms.ward.config.NatsConfig;
 import com.hms.ward.entity.Admission;
 import com.hms.ward.entity.Bed;
 import com.hms.ward.entity.Ward;
 import com.hms.ward.entity.WardServiceCharge;
+import io.nats.client.JetStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -18,7 +19,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BillingWardEventPublisher {
 
-    private final RabbitTemplate rabbitTemplate;
+    private final JetStream jetStream;
+    private final ObjectMapper objectMapper;
 
     public void publishBillingWard(Admission admission, Ward ward, Bed bed,
                                     List<WardServiceCharge> services, BigDecimal total) {
@@ -43,11 +45,8 @@ public class BillingWardEventPublisher {
                             : null)
                     .build();
 
-            rabbitTemplate.convertAndSend(
-                    RabbitMQConfig.BILLING_EXCHANGE,
-                    RabbitMQConfig.BILLING_WARD_ROUTING_KEY,
-                    event);
-
+            byte[] payload = objectMapper.writeValueAsBytes(event);
+            jetStream.publish(NatsConfig.SUBJECT_BILLING_WARD, payload);
             log.info("Published billing.ward event for admission {}", admission.getId());
         } catch (Exception e) {
             log.error("Failed to publish billing.ward event for admission {}: {}",

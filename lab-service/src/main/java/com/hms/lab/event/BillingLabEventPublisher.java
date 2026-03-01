@@ -1,10 +1,11 @@
 package com.hms.lab.event;
 
-import com.hms.lab.config.RabbitMQConfig;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hms.lab.config.NatsConfig;
 import com.hms.lab.entity.LabOrder;
+import io.nats.client.JetStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -14,7 +15,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BillingLabEventPublisher {
 
-    private final RabbitTemplate rabbitTemplate;
+    private final JetStream jetStream;
+    private final ObjectMapper objectMapper;
 
     public void publishBillingLab(LabOrder order) {
         try {
@@ -35,11 +37,8 @@ public class BillingLabEventPublisher {
                     .paidAt(order.getPaidAt())
                     .build();
 
-            rabbitTemplate.convertAndSend(
-                    RabbitMQConfig.BILLING_EXCHANGE,
-                    RabbitMQConfig.BILLING_LAB_ROUTING_KEY,
-                    event);
-
+            byte[] payload = objectMapper.writeValueAsBytes(event);
+            jetStream.publish(NatsConfig.SUBJECT_BILLING_LAB, payload);
             log.info("Published billing.lab event for order {}", order.getId());
         } catch (Exception e) {
             log.error("Failed to publish billing.lab event for order {}: {}", order.getId(), e.getMessage(), e);

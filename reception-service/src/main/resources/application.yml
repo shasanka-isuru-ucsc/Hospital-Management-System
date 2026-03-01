@@ -20,11 +20,8 @@ spring:
     show-sql: true
     database-platform: org.hibernate.dialect.PostgreSQLDialect
 
-  rabbitmq:
-    host: ${RABBITMQ_HOST:localhost}
-    port: ${RABBITMQ_PORT:5672}
-    username: ${RABBITMQ_USER:guest}
-    password: ${RABBITMQ_PASS:guest}
+nats:
+  url: ${NATS_URL:nats://localhost:4222}
 
 minio:
   url: ${MINIO_URL:http://localhost:9000}

@@ -22,5 +22,6 @@ public class BillingWoundEvent {
     private String patientName;
     private Double woundCareFee;
     private Double discountPercent;
+    private String discountReason;
     private LocalDateTime completedAt;
 }

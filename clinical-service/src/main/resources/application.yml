@@ -17,28 +17,14 @@ spring:
             hibernate:
                 format_sql: true
         show-sql: true
-    rabbitmq:
-        host: localhost
-        port: 5672
-        username: guest
-        password: guest
+nats:
+    url: ${NATS_URL:nats://localhost:4222}
 
 minio:
     url: http://localhost:9000
     accessKey: minioadmin
     secretKey: minioadmin
     bucketName: hms-scans
-
-queue:
-    billing:
-        exchange: billing.events
-        routing-key:
-            opd: billing.opd
-            wound: billing.wound
-    lab:
-        exchange: lab.events
-        routing-key:
-            request: lab.requested
 
 logging:
     level:

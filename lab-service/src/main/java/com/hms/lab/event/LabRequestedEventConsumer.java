@@ -1,16 +1,23 @@
 package com.hms.lab.event;
 
-import com.hms.lab.config.RabbitMQConfig;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hms.lab.config.NatsConfig;
 import com.hms.lab.dto.LabOrderCreateRequest;
 import com.hms.lab.dto.LabOrderDto;
 import com.hms.lab.dto.OrderTestRequest;
 import com.hms.lab.exception.BusinessException;
 import com.hms.lab.service.LabOrderService;
+import io.nats.client.Connection;
+import io.nats.client.Dispatcher;
+import io.nats.client.JetStream;
+import io.nats.client.Message;
+import io.nats.client.PushSubscribeOptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.util.List;
 
 @Slf4j
@@ -18,14 +25,49 @@ import java.util.List;
 @RequiredArgsConstructor
 public class LabRequestedEventConsumer {
 
+    private final Connection natsConnection;
+    private final JetStream jetStream;
     private final LabOrderService labOrderService;
+    private final ObjectMapper objectMapper;
 
-    @RabbitListener(queues = RabbitMQConfig.LAB_REQUESTED_QUEUE)
-    public void handleLabRequested(LabRequestedEvent event) {
+    private Dispatcher dispatcher;
+
+    @PostConstruct
+    public void subscribe() {
+        try {
+            dispatcher = natsConnection.createDispatcher();
+
+            jetStream.subscribe(NatsConfig.SUBJECT_LAB_REQUESTED, dispatcher,
+                    this::handleMessage, false,
+                    PushSubscribeOptions.builder().durable("lab-requested").build());
+
+            log.info("Lab service subscribed to lab.requested NATS subject");
+        } catch (Exception e) {
+            log.error("Failed to subscribe to NATS lab.requested subject", e);
+        }
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        if (dispatcher != null) {
+            natsConnection.closeDispatcher(dispatcher);
+        }
+    }
+
+    private void handleMessage(Message msg) {
+        try {
+            LabRequestedEvent event = objectMapper.readValue(msg.getData(), LabRequestedEvent.class);
+            handleLabRequested(event);
+            msg.ack();
+        } catch (Exception e) {
+            log.error("Error processing NATS message on subject lab.requested", e);
+        }
+    }
+
+    private void handleLabRequested(LabRequestedEvent event) {
         log.info("Received lab.requested event for session: {}, patient: {}",
                 event.getSessionId(), event.getPatientName());
         try {
-            // Map event tests to request format
             List<OrderTestRequest> testRequests = event.getTests().stream()
                     .map(t -> {
                         OrderTestRequest req = new OrderTestRequest();

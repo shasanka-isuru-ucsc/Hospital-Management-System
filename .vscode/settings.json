@@ -1,3 +1,4 @@
 {
-    "java.compile.nullAnalysis.mode": "disabled"
+    "java.compile.nullAnalysis.mode": "disabled",
+    "livePreview.defaultPreviewPath": "/HMS_Architecture_Diagram.html"
 }

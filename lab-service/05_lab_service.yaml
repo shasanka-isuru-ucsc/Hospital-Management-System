@@ -14,10 +14,10 @@ info:
     **Base URL (via gateway):** `http://localhost:3000/lab`
     **Direct URL:** `http://localhost:3005`
     
-    **RabbitMQ events consumed:**
+    **NATS events consumed:**
     - `lab.requested` → auto-creates a lab order from a clinical session request
     
-    **RabbitMQ events published:**
+    **NATS events published:**
     - `billing.lab` → on `PUT /orders/:id/pay` → Finance Service records payment
   version: 1.0.0
 
@@ -458,7 +458,7 @@ paths:
         Creates a lab order for a patient. Computes total from test catalog prices.
         
         For **clinical session requests**, orders are created automatically when the Lab Service 
-        consumes the `lab.requested` RabbitMQ event. You only need this endpoint for walk-in patients.
+        consumes the `lab.requested` NATS event. You only need this endpoint for walk-in patients.
       requestBody:
         required: true
         content:
@@ -749,9 +749,9 @@ paths:
       summary: Record lab order payment
       description: |
         Records payment for a lab order. After recording, publishes `billing.lab` event
-        to RabbitMQ so Finance Service can log the payment in its records.
+        to NATS so Finance Service can log the payment in its records.
         
-        **RabbitMQ event published:**
+        **NATS event published:**
         ```
         Exchange: billing.events
         Routing key: billing.lab

@@ -10,7 +10,7 @@ info:
     **Base URL (via gateway):** `http://localhost:3000/clinical`
     **Direct URL:** `http://localhost:3002`
     
-    **RabbitMQ events published by this service:**
+    **NATS events published by this service:**
     - `billing.events` → `billing.opd` when OPD session completed
     - `billing.events` → `billing.wound` when wound care session completed
     - `lab.events` → `lab.requested` when doctor requests lab tests
@@ -583,8 +583,8 @@ paths:
       summary: Complete a session
       description: |
         Marks the session as completed. This triggers the billing event:
-        - OPD session → publishes `billing.opd` to RabbitMQ → Finance creates invoice automatically
-        - Wound care → publishes `billing.wound` to RabbitMQ → Finance creates invoice automatically
+        - OPD session → publishes `billing.opd` to NATS → Finance creates invoice automatically
+        - Wound care → publishes `billing.wound` to NATS → Finance creates invoice automatically
         
         Session cannot be edited after completion.
       parameters:
@@ -985,7 +985,7 @@ paths:
       summary: Request lab tests for patient
       description: |
         Doctor requests one or more lab tests. This publishes a `lab.requested` event
-        to RabbitMQ. The Lab Service picks it up and creates a pre-populated order.
+        to NATS. The Lab Service picks it up and creates a pre-populated order.
         The `lab_order_id` on the request will be populated once Lab Service processes the event.
       parameters:
         - name: id

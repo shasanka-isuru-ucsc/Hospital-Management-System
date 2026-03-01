@@ -11,8 +11,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Tests the full admission lifecycle: ward creation → bed assignment →
  * patient admission → service charges → discharge → billing event.
  *
- * All tests run in order against a real PostgreSQL + RabbitMQ testcontainer.
+ * All tests run in order against a real PostgreSQL + NATS testcontainer.
  * defer-datasource-initialization=false ensures schema.sql runs BEFORE
  * Hibernate DDL so the 'ward' schema exists when tables are created.
  */
@@ -42,15 +42,17 @@ class WardServiceE2ETest {
             .withPassword("test_pass");
 
     @Container
-    static RabbitMQContainer rabbitMQ = new RabbitMQContainer("rabbitmq:3-management");
+    @SuppressWarnings("resource")
+    static GenericContainer<?> nats = new GenericContainer<>("nats:2.10-alpine")
+            .withCommand("-js")
+            .withExposedPorts(4222);
 
     @DynamicPropertySource
     static void setProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
-        registry.add("spring.rabbitmq.host", rabbitMQ::getHost);
-        registry.add("spring.rabbitmq.port", rabbitMQ::getAmqpPort);
+        registry.add("nats.url", () -> "nats://localhost:" + nats.getMappedPort(4222));
         // Run schema.sql BEFORE Hibernate DDL so 'ward' schema is created first
         registry.add("spring.jpa.defer-datasource-initialization", () -> "false");
     }

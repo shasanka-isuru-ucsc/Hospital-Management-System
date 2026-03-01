@@ -5,13 +5,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
 
 /**
  * Received from Lab Service when lab tests are ordered/paid.
- * routing key: billing.lab
+ * subject: billing.lab
  */
 @Data
 @Builder
@@ -23,7 +23,8 @@ public class BillingLabEvent {
     private String patientName;
     private List<LabTestItem> tests;
     private Double totalAmount;
-    private LocalDateTime paidAt;
+    private String paymentMethod;
+    private ZonedDateTime paidAt;
 
     @Data
     @NoArgsConstructor

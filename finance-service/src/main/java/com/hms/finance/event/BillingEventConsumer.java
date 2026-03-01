@@ -1,30 +1,92 @@
 package com.hms.finance.event;
 
-import com.hms.finance.config.RabbitMQConfig;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hms.finance.config.NatsConfig;
+import com.hms.finance.dto.InvoiceDto;
 import com.hms.finance.dto.LineItemRequest;
+import com.hms.finance.dto.PaymentRequest;
 import com.hms.finance.exception.BusinessException;
 import com.hms.finance.service.InvoiceService;
+import io.nats.client.Connection;
+import io.nats.client.Dispatcher;
+import io.nats.client.JetStream;
+import io.nats.client.Message;
+import io.nats.client.PushSubscribeOptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class BillingEventConsumer {
 
+    private final Connection natsConnection;
+    private final JetStream jetStream;
     private final InvoiceService invoiceService;
+    private final ObjectMapper objectMapper;
+
+    private Dispatcher dispatcher;
+
+    @PostConstruct
+    public void subscribe() {
+        try {
+            dispatcher = natsConnection.createDispatcher();
+
+            jetStream.subscribe(NatsConfig.SUBJECT_BILLING_OPD, dispatcher,
+                    msg -> handleMessage(msg, BillingOpdEvent.class, this::handleBillingOpd),
+                    false,
+                    PushSubscribeOptions.builder().durable("finance-billing-opd").build());
+
+            jetStream.subscribe(NatsConfig.SUBJECT_BILLING_WOUND, dispatcher,
+                    msg -> handleMessage(msg, BillingWoundEvent.class, this::handleBillingWound),
+                    false,
+                    PushSubscribeOptions.builder().durable("finance-billing-wound").build());
+
+            jetStream.subscribe(NatsConfig.SUBJECT_BILLING_WARD, dispatcher,
+                    msg -> handleMessage(msg, BillingWardEvent.class, this::handleBillingWard),
+                    false,
+                    PushSubscribeOptions.builder().durable("finance-billing-ward").build());
+
+            jetStream.subscribe(NatsConfig.SUBJECT_BILLING_LAB, dispatcher,
+                    msg -> handleMessage(msg, BillingLabEvent.class, this::handleBillingLab),
+                    false,
+                    PushSubscribeOptions.builder().durable("finance-billing-lab").build());
+
+            log.info("Finance service subscribed to all billing NATS subjects");
+        } catch (Exception e) {
+            log.error("Failed to subscribe to NATS billing subjects", e);
+        }
+    }
+
+    @PreDestroy
+    public void cleanup() {
+        if (dispatcher != null) {
+            natsConnection.closeDispatcher(dispatcher);
+        }
+    }
+
+    private <T> void handleMessage(Message msg, Class<T> type, Consumer<T> handler) {
+        try {
+            T event = objectMapper.readValue(msg.getData(), type);
+            handler.accept(event);
+            msg.ack();
+        } catch (Exception e) {
+            log.error("Error processing NATS message on subject {}", msg.getSubject(), e);
+        }
+    }
 
     // ─── OPD Billing ─────────────────────────────────────────────────────────────
 
-    @RabbitListener(queues = RabbitMQConfig.BILLING_OPD_QUEUE)
-    public void handleBillingOpd(BillingOpdEvent event) {
+    private void handleBillingOpd(BillingOpdEvent event) {
         log.info("Received billing.opd event for session: {}", event.getSessionId());
         try {
             List<LineItemRequest> lineItems = new ArrayList<>();
@@ -46,7 +108,7 @@ public class BillingEventConsumer {
                     event.getSessionId(),
                     lineItems,
                     discountAmount,
-                    event.getDiscountPercent() != null ? "Session discount" : null
+                    event.getDiscountReason()
             );
         } catch (BusinessException e) {
             if ("DUPLICATE_INVOICE".equals(e.getCode())) {
@@ -63,8 +125,7 @@ public class BillingEventConsumer {
 
     // ─── Wound Care Billing ───────────────────────────────────────────────────────
 
-    @RabbitListener(queues = RabbitMQConfig.BILLING_WOUND_QUEUE)
-    public void handleBillingWound(BillingWoundEvent event) {
+    private void handleBillingWound(BillingWoundEvent event) {
         log.info("Received billing.wound event for session: {}", event.getSessionId());
         try {
             List<LineItemRequest> lineItems = new ArrayList<>();
@@ -86,7 +147,7 @@ public class BillingEventConsumer {
                     event.getSessionId(),
                     lineItems,
                     discountAmount,
-                    event.getDiscountPercent() != null ? "Session discount" : null
+                    event.getDiscountReason()
             );
         } catch (BusinessException e) {
             if ("DUPLICATE_INVOICE".equals(e.getCode())) {
@@ -102,8 +163,7 @@ public class BillingEventConsumer {
 
     // ─── Ward Billing ─────────────────────────────────────────────────────────────
 
-    @RabbitListener(queues = RabbitMQConfig.BILLING_WARD_QUEUE)
-    public void handleBillingWard(BillingWardEvent event) {
+    private void handleBillingWard(BillingWardEvent event) {
         log.info("Received billing.ward event for admission: {}", event.getAdmissionId());
         try {
             List<LineItemRequest> lineItems = new ArrayList<>();
@@ -119,7 +179,6 @@ public class BillingEventConsumer {
                     lineItems.add(item);
                 }
             } else {
-                // Fallback: single line item with total
                 LineItemRequest item = new LineItemRequest();
                 item.setItemName("Ward Services");
                 item.setItemType("bed_charge");
@@ -152,8 +211,7 @@ public class BillingEventConsumer {
 
     // ─── Lab Billing ──────────────────────────────────────────────────────────────
 
-    @RabbitListener(queues = RabbitMQConfig.BILLING_LAB_QUEUE)
-    public void handleBillingLab(BillingLabEvent event) {
+    private void handleBillingLab(BillingLabEvent event) {
         log.info("Received billing.lab event for order: {}", event.getOrderId());
         try {
             List<LineItemRequest> lineItems = new ArrayList<>();
@@ -178,7 +236,7 @@ public class BillingEventConsumer {
                 lineItems.add(item);
             }
 
-            invoiceService.createEventInvoice(
+            InvoiceDto invoice = invoiceService.createEventInvoice(
                     event.getPatientId(),
                     event.getPatientName(),
                     "lab",
@@ -187,6 +245,13 @@ public class BillingEventConsumer {
                     BigDecimal.ZERO,
                     null
             );
+            if (event.getPaymentMethod() != null && event.getTotalAmount() != null && event.getTotalAmount() > 0) {
+                PaymentRequest paymentRequest = new PaymentRequest();
+                paymentRequest.setPaymentMethod(event.getPaymentMethod());
+                paymentRequest.setAmountPaid(BigDecimal.valueOf(event.getTotalAmount()));
+                invoiceService.recordPayment(invoice.getId(), paymentRequest);
+                log.info("Lab invoice {} marked as paid via {}", invoice.getId(), event.getPaymentMethod());
+            }
         } catch (BusinessException e) {
             if ("DUPLICATE_INVOICE".equals(e.getCode())) {
                 log.warn("Duplicate lab invoice for order {}, ignoring.", event.getOrderId());

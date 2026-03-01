@@ -24,5 +24,6 @@ public class BillingOpdEvent {
     private String doctorName;
     private Double consultationFee;
     private Double discountPercent;
+    private String discountReason;
     private LocalDateTime completedAt;
 }
