@@ -1,12 +1,36 @@
 ### API Tests for Reception Service
-### To run these directly in your IDE, install the "REST Client" extension in VS Code.
+### Port: 3001 | Base URL: http://localhost:3001
+### Auth: Bearer token via Keycloak
 
 @baseUrl = http://localhost:3001
+@keycloakUrl = http://localhost:8080
+@realm = hms
+@clientId = hms-backend
+@clientSecret = your-client-secret
 @receptionistId = a1b2c3d4-e5f6-7890-abcd-ef1234567890
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 0. GET ACCESS TOKEN
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 0. Get Access Token (Keycloak)
+# @name getToken
+POST {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id={{clientId}}&client_secret={{clientSecret}}&username=admin&password=admin
+
+### Auth token (auto-filled after step 0)
+@adminToken = {{getToken.response.body.access_token}}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PATIENTS
+# ──────────────────────────────────────────────────────────────────────────────
 
 ### 1. Register a new patient
 # @name registerPatient
 POST {{baseUrl}}/patients
+Authorization: Bearer {{adminToken}}
 X-User-Id: {{receptionistId}}
 X-User-Role: receptionist
 Content-Type: application/json
@@ -25,6 +49,7 @@ Content-Type: application/json
 
 ### 2. Get the created patient by ID
 GET {{baseUrl}}/patients/{{patientId}}
+Authorization: Bearer {{adminToken}}
 X-User-Id: {{receptionistId}}
 X-User-Role: receptionist
 
@@ -32,6 +57,7 @@ X-User-Role: receptionist
 
 ### 3. Search patients by mobile/name
 GET {{baseUrl}}/patients/search?q=%2B94711234567
+Authorization: Bearer {{adminToken}}
 X-User-Id: {{receptionistId}}
 X-User-Role: receptionist
 
@@ -40,6 +66,7 @@ X-User-Role: receptionist
 ### 4. Update patient details
 # @name updatePatient
 PUT {{baseUrl}}/patients/{{patientId}}
+Authorization: Bearer {{adminToken}}
 X-User-Id: {{receptionistId}}
 X-User-Role: receptionist
 Content-Type: application/json
@@ -54,9 +81,14 @@ Content-Type: application/json
 
 ###
 
+# ──────────────────────────────────────────────────────────────────────────────
+# TOKENS / QUEUE
+# ──────────────────────────────────────────────────────────────────────────────
+
 ### 5. Issue a token for OPD
 # @name issueToken
 POST {{baseUrl}}/tokens
+Authorization: Bearer {{adminToken}}
 X-User-Id: {{receptionistId}}
 X-User-Role: receptionist
 Content-Type: application/json
@@ -70,8 +102,9 @@ Content-Type: application/json
 
 @tokenId = {{issueToken.response.body.data.id}}
 
-### 6. Get all tokens for today 
+### 6. Get all tokens for today
 GET {{baseUrl}}/tokens/today
+Authorization: Bearer {{adminToken}}
 X-User-Id: {{receptionistId}}
 X-User-Role: receptionist
 
@@ -79,13 +112,15 @@ X-User-Role: receptionist
 
 ### 7. Get OPD live queue
 GET {{baseUrl}}/queue/opd
+Authorization: Bearer {{adminToken}}
 X-User-Id: {{receptionistId}}
 X-User-Role: receptionist
 
-### 
+###
 
 ### 8. Update token status to 'called'
 PUT {{baseUrl}}/tokens/{{tokenId}}/status
+Authorization: Bearer {{adminToken}}
 X-User-Id: {{receptionistId}}
 X-User-Role: receptionist
 Content-Type: application/json
@@ -96,10 +131,14 @@ Content-Type: application/json
 
 ###
 
-### 9. Book an appointment
+# ──────────────────────────────────────────────────────────────────────────────
+# APPOINTMENTS
+# ──────────────────────────────────────────────────────────────────────────────
 
+### 9. Book an appointment
 # @name bookAppointment
 POST {{baseUrl}}/appointments
+Authorization: Bearer {{adminToken}}
 X-User-Id: {{receptionistId}}
 X-User-Role: receptionist
 Content-Type: application/json
@@ -112,13 +151,13 @@ Content-Type: application/json
   "toTime": "09:15"
 }
 
-
 ###
 
 @appointmentId = {{bookAppointment.response.body.data.id}}
 
 ### 10. Get appointment by ID
 GET {{baseUrl}}/appointments/{{appointmentId}}
+Authorization: Bearer {{adminToken}}
 X-User-Id: {{receptionistId}}
 X-User-Role: receptionist
 
@@ -126,13 +165,15 @@ X-User-Role: receptionist
 
 ### 11. List appointments for a specific date
 GET {{baseUrl}}/appointments?date=2026-03-01
+Authorization: Bearer {{adminToken}}
 X-User-Id: {{receptionistId}}
 X-User-Role: receptionist
 
 ###
 
-### 12. Update appointment details (JSON)
+### 12. Update appointment details
 PUT {{baseUrl}}/appointments/{{appointmentId}}
+Authorization: Bearer {{adminToken}}
 X-User-Id: {{receptionistId}}
 X-User-Role: receptionist
 Content-Type: application/json
@@ -147,8 +188,12 @@ Content-Type: application/json
   "status": "scheduled"
 }
 
+###
+
 ### 13. Cancel an appointment
 DELETE {{baseUrl}}/appointments/{{appointmentId}}
+Authorization: Bearer {{adminToken}}
 X-User-Id: {{receptionistId}}
 X-User-Role: receptionist
 
+###

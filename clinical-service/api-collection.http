@@ -1,14 +1,40 @@
-### Clinical Service API Collection
-### Base URL: http://localhost:3002
+### HMS Clinical Service API Collection
+### Port: 3002 | Base URL: http://localhost:3002
+### Auth: Bearer token via Keycloak
 
-### ─── SESSIONS ───
+@baseUrl = http://localhost:3002
+@keycloakUrl = http://localhost:8080
+@realm = hms
+@clientId = hms-backend
+@clientSecret = your-client-secret
+@doctorId = 00000000-0000-0000-0000-000000000001
+@doctorName = Dr. Jenny Smith
 
-### Create a new clinical session
+# ──────────────────────────────────────────────────────────────────────────────
+# 0. GET ACCESS TOKEN
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 0. Get Access Token (Keycloak)
+# @name getToken
+POST {{keycloakUrl}}/realms/{{realm}}/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id={{clientId}}&client_secret={{clientSecret}}&username=admin&password=admin
+
+### Auth token (auto-filled after step 0)
+@adminToken = {{getToken.response.body.access_token}}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SESSIONS
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 1. Create a new clinical session
 # @name createClinicalSession
-POST http://localhost:3002/sessions
+POST {{baseUrl}}/sessions
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 Content-Type: application/json
-X-User-Id: 00000000-0000-0000-0000-000000000001
-X-User-Name: Dr. Jenny Smith
 
 {
   "patientId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
@@ -18,19 +44,30 @@ X-User-Name: Dr. Jenny Smith
 
 ###
 
-### List sessions
-GET http://localhost:3002/sessions?page=1&limit=20
-
 @sessionId = {{createClinicalSession.response.body.data.id}}
+@patientId = {{createClinicalSession.response.body.data.patientId}}
+
+### 2. List sessions
+GET {{baseUrl}}/sessions?page=1&limit=20
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
+
 ###
 
-### Get session by ID
-GET http://localhost:3002/sessions/{{sessionId}}
+### 3. Get session by ID
+GET {{baseUrl}}/sessions/{{sessionId}}
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 
 ###
 
-### Update session
-PUT http://localhost:3002/sessions/{{sessionId}}
+### 4. Update session
+PUT {{baseUrl}}/sessions/{{sessionId}}
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 Content-Type: application/json
 
 {
@@ -40,8 +77,11 @@ Content-Type: application/json
 
 ###
 
-### Complete session
-PUT http://localhost:3002/sessions/{{sessionId}}/complete
+### 5. Complete session
+PUT {{baseUrl}}/sessions/{{sessionId}}/complete
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 Content-Type: application/json
 
 {
@@ -49,10 +89,17 @@ Content-Type: application/json
   "discountPercent": 0
 }
 
-### ─── VITALS ───
+###
 
-### Record vitals
-POST http://localhost:3002/sessions/{{sessionId}}/vitals
+# ──────────────────────────────────────────────────────────────────────────────
+# VITALS
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 6. Record vitals
+POST {{baseUrl}}/sessions/{{sessionId}}/vitals
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 Content-Type: application/json
 
 {
@@ -67,21 +114,32 @@ Content-Type: application/json
 
 ###
 
-### Get vitals
-GET http://localhost:3002/sessions/{{sessionId}}/vitals
-
+### 7. Get vitals
+GET {{baseUrl}}/sessions/{{sessionId}}/vitals
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 
 ###
-@patientId = {{createClinicalSession.response.body.data.patientId}}
 
-### Get vitals history for patient
-GET http://localhost:3002/patients/{{patientId}}/vitals-history
+### 8. Get vitals history for patient
+GET {{baseUrl}}/patients/{{patientId}}/vitals-history
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 
-### ─── PRESCRIPTIONS ───
+###
 
-### Add prescriptions
+# ──────────────────────────────────────────────────────────────────────────────
+# PRESCRIPTIONS
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 9. Add prescriptions
 # @name addPrescriptions
-POST http://localhost:3002/sessions/{{sessionId}}/prescriptions
+POST {{baseUrl}}/sessions/{{sessionId}}/prescriptions
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 Content-Type: application/json
 
 {
@@ -107,15 +165,25 @@ Content-Type: application/json
 
 ###
 
-### Get session prescriptions
-GET http://localhost:3002/sessions/{{sessionId}}/prescriptions
+### 10. Get session prescriptions
+GET {{baseUrl}}/sessions/{{sessionId}}/prescriptions
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 
 ###
 
-### Get session prescriptions by type
-GET http://localhost:3002/sessions/{{sessionId}}/prescriptions?type=internal
+### 11. Get session prescriptions by type
+GET {{baseUrl}}/sessions/{{sessionId}}/prescriptions?type=internal
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 
-### ─── PHARMACY ───
+###
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PHARMACY
+# ──────────────────────────────────────────────────────────────────────────────
 # NOTE: pharmacy queue only shows prescriptions from COMPLETED sessions.
 # Prescriptions from open/ongoing sessions are hidden until the doctor completes the session.
 #
@@ -135,22 +203,34 @@ GET http://localhost:3002/sessions/{{sessionId}}/prescriptions?type=internal
 #   }
 # Intended consumer: WebSocket gateway → Pharmacy Display (real-time notification)
 
-### Get pharmacy queue (only completed-session pending internal prescriptions)
-GET http://localhost:3002/pharmacy/queue
+### 12. Get pharmacy queue (only completed-session pending internal prescriptions)
+GET {{baseUrl}}/pharmacy/queue
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 
 ###
 
-# Prescription ID
-# Update this id manually based on the queue details
+# Prescription ID — update manually based on the queue details
 @rxId = 9f8b077d-92c7-4a5e-8660-94b323b20cf6
 
-### Dispense prescription
-PUT http://localhost:3002/pharmacy/{{rxId}}/dispense
+### 13. Dispense prescription
+PUT {{baseUrl}}/pharmacy/{{rxId}}/dispense
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 
-### ─── LAB REQUESTS ───
+###
 
-### Request lab tests
-POST http://localhost:3002/sessions/{{sessionId}}/lab-requests
+# ──────────────────────────────────────────────────────────────────────────────
+# LAB REQUESTS
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 14. Request lab tests
+POST {{baseUrl}}/sessions/{{sessionId}}/lab-requests
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 Content-Type: application/json
 
 {
@@ -163,24 +243,44 @@ Content-Type: application/json
 
 ###
 
-### Get lab requests
-GET http://localhost:3002/sessions/{{sessionId}}/lab-requests
+### 15. Get lab requests
+GET {{baseUrl}}/sessions/{{sessionId}}/lab-requests
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 
-### ─── PATIENT HISTORY ───
+###
 
-### Get patient clinical history
-GET http://localhost:3002/patients/{{patientId}}/history?page=1&limit=20
+# ──────────────────────────────────────────────────────────────────────────────
+# PATIENT HISTORY
+# ──────────────────────────────────────────────────────────────────────────────
 
-### ─── IMAGES ───
+### 16. Get patient clinical history
+GET {{baseUrl}}/patients/{{patientId}}/history?page=1&limit=20
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
 
-### Upload image (multipart)
+###
+
+# ──────────────────────────────────────────────────────────────────────────────
+# IMAGES
+# ──────────────────────────────────────────────────────────────────────────────
+
+### 17. Upload image (multipart)
 # Use Postman or cURL:
 # curl -X POST http://localhost:3002/sessions/{{sessionId}}/images \
+#   -H "Authorization: Bearer <token>" \
 #   -F "image=@path/to/image.jpg" \
 #   -F "caption=Left knee X-ray" \
 #   -F "imageType=scan"
 
 ###
 
-### Get session images
-GET http://localhost:3002/sessions/{{sessionId}}/images
+### 18. Get session images
+GET {{baseUrl}}/sessions/{{sessionId}}/images
+Authorization: Bearer {{adminToken}}
+X-User-Id: {{doctorId}}
+X-User-Name: {{doctorName}}
+
+###
