@@ -16,9 +16,10 @@ import java.io.IOException;
 @Configuration
 public class NatsConfig {
 
-    public static final String SUBJECT_BILLING_OPD    = "billing.opd";
-    public static final String SUBJECT_BILLING_WOUND  = "billing.wound";
-    public static final String SUBJECT_LAB_REQUESTED  = "lab.requested";
+    public static final String SUBJECT_BILLING_OPD     = "billing.opd";
+    public static final String SUBJECT_BILLING_WOUND   = "billing.wound";
+    public static final String SUBJECT_LAB_REQUESTED   = "lab.requested";
+    public static final String SUBJECT_PHARMACY_NEW_RX = "pharmacy.new_rx";
 
     @Value("${nats.url:nats://localhost:4222}")
     private String natsUrl;
@@ -53,6 +54,12 @@ public class NatsConfig {
             createStreamIfNotExists(jsm, StreamConfiguration.builder()
                     .name("LAB")
                     .subjects("lab.>")
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.WorkQueue)
+                    .build());
+            createStreamIfNotExists(jsm, StreamConfiguration.builder()
+                    .name("PHARMACY")
+                    .subjects("pharmacy.>")
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.WorkQueue)
                     .build());

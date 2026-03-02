@@ -1,9 +1,11 @@
 package com.hms.clinical.service;
 
 import com.hms.clinical.dto.*;
+import com.hms.clinical.entity.Prescription;
 import com.hms.clinical.entity.Session;
 import com.hms.clinical.event.BillingEvent;
 import com.hms.clinical.event.EventPublisher;
+import com.hms.clinical.event.PharmacyNewRxEvent;
 import com.hms.clinical.exception.BusinessException;
 import com.hms.clinical.exception.ResourceNotFoundException;
 import com.hms.clinical.repository.SessionRepository;
@@ -211,6 +213,119 @@ class SessionServiceTest {
 
         verify(eventPublisher, times(1)).publishBillingWoundEvent(any(BillingEvent.class));
         verify(eventPublisher, never()).publishBillingOpdEvent(any());
+    }
+
+    @Test
+    void completeSession_WithInternalPrescriptions_ShouldPublishPharmacyEvent() {
+        UUID sessionId = UUID.randomUUID();
+        Session session = new Session();
+        session.setId(sessionId);
+        session.setPatientId(patientId);
+        session.setPatientName("Patient");
+        session.setDoctorId(doctorId);
+        session.setDoctorName("Dr. Smith");
+        session.setSessionType("opd");
+        session.setStatus("open");
+
+        Prescription rx1 = new Prescription();
+        rx1.setId(UUID.randomUUID());
+        rx1.setSession(session);
+        rx1.setType("internal");
+        rx1.setMedicineName("Paracetamol");
+        rx1.setDosage("500mg");
+        rx1.setFrequency("3x daily");
+        rx1.setDurationDays(5);
+        rx1.setStatus("pending");
+
+        Prescription rx2 = new Prescription();
+        rx2.setId(UUID.randomUUID());
+        rx2.setSession(session);
+        rx2.setType("external");
+        rx2.setMedicineName("Amoxicillin");
+        rx2.setDosage("500mg");
+        rx2.setFrequency("2x daily");
+        rx2.setDurationDays(7);
+        rx2.setStatus("dispensed");
+
+        session.setPrescriptions(List.of(rx1, rx2));
+
+        when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+        when(sessionRepository.save(any(Session.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SessionCompleteRequest request = SessionCompleteRequest.builder()
+                .diagnosis("Typhoid")
+                .build();
+
+        sessionService.completeSession(sessionId, request);
+
+        // Billing event published
+        verify(eventPublisher, times(1)).publishBillingOpdEvent(any(BillingEvent.class));
+
+        // Pharmacy event published with only the internal prescription
+        ArgumentCaptor<PharmacyNewRxEvent> captor = ArgumentCaptor.forClass(PharmacyNewRxEvent.class);
+        verify(eventPublisher, times(1)).publishPharmacyNewRxEvent(captor.capture());
+        PharmacyNewRxEvent pharmacyEvent = captor.getValue();
+        assertEquals(sessionId, pharmacyEvent.getSessionId());
+        assertEquals(1, pharmacyEvent.getPrescriptions().size());
+        assertEquals("Paracetamol", pharmacyEvent.getPrescriptions().get(0).getMedicineName());
+    }
+
+    @Test
+    void completeSession_WithoutInternalPrescriptions_ShouldNotPublishPharmacyEvent() {
+        UUID sessionId = UUID.randomUUID();
+        Session session = new Session();
+        session.setId(sessionId);
+        session.setPatientId(patientId);
+        session.setPatientName("Patient");
+        session.setDoctorId(doctorId);
+        session.setDoctorName("Dr. Smith");
+        session.setSessionType("opd");
+        session.setStatus("open");
+        // No prescriptions set (null)
+
+        when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+        when(sessionRepository.save(any(Session.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SessionCompleteRequest request = SessionCompleteRequest.builder()
+                .diagnosis("Flu")
+                .build();
+
+        sessionService.completeSession(sessionId, request);
+
+        verify(eventPublisher, times(1)).publishBillingOpdEvent(any(BillingEvent.class));
+        verify(eventPublisher, never()).publishPharmacyNewRxEvent(any());
+    }
+
+    @Test
+    void completeSession_OnlyExternalPrescriptions_ShouldNotPublishPharmacyEvent() {
+        UUID sessionId = UUID.randomUUID();
+        Session session = new Session();
+        session.setId(sessionId);
+        session.setPatientId(patientId);
+        session.setPatientName("Patient");
+        session.setDoctorId(doctorId);
+        session.setDoctorName("Dr. Smith");
+        session.setSessionType("opd");
+        session.setStatus("open");
+
+        Prescription external = new Prescription();
+        external.setId(UUID.randomUUID());
+        external.setSession(session);
+        external.setType("external");
+        external.setMedicineName("Amoxicillin");
+        external.setStatus("dispensed");
+        session.setPrescriptions(List.of(external));
+
+        when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
+        when(sessionRepository.save(any(Session.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SessionCompleteRequest request = SessionCompleteRequest.builder()
+                .diagnosis("Flu")
+                .build();
+
+        sessionService.completeSession(sessionId, request);
+
+        verify(eventPublisher, never()).publishPharmacyNewRxEvent(any());
     }
 
     @Test

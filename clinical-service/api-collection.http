@@ -116,14 +116,32 @@ GET http://localhost:3002/sessions/{{sessionId}}/prescriptions
 GET http://localhost:3002/sessions/{{sessionId}}/prescriptions?type=internal
 
 ### ─── PHARMACY ───
+# NOTE: pharmacy queue only shows prescriptions from COMPLETED sessions.
+# Prescriptions from open/ongoing sessions are hidden until the doctor completes the session.
+#
+# NATS event: pharmacy.new_rx  (published by clinical-service → PHARMACY JetStream stream)
+# Triggered: when PUT /sessions/{id}/complete is called AND the session has ≥1 internal prescription
+# Payload:
+#   {
+#     "sessionId": "<uuid>",
+#     "patientId": "<uuid>",
+#     "patientName": "string",
+#     "doctorName": "string",
+#     "completedAt": "2026-03-02T09:00:00",
+#     "prescriptions": [
+#       { "id": "<uuid>", "medicineName": "Paracetamol", "dosage": "500mg",
+#         "frequency": "Every 8 hours", "durationDays": 5, "instructions": "Take with water" }
+#     ]
+#   }
+# Intended consumer: WebSocket gateway → Pharmacy Display (real-time notification)
 
-### Get pharmacy queue
+### Get pharmacy queue (only completed-session pending internal prescriptions)
 GET http://localhost:3002/pharmacy/queue
 
 ###
 
 # Prescription ID
-@rxId = 50d75423-839d-4dd7-9743-2bb37dffc3d7
+@rxId = 087d6e85-7f8f-4d7e-892e-9efd250238fd
 
 ### Dispense prescription
 PUT http://localhost:3002/pharmacy/{{rxId}}/dispense

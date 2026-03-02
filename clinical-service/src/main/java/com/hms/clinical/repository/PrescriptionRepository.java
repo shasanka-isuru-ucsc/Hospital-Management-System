@@ -12,6 +12,6 @@ public interface PrescriptionRepository extends JpaRepository<Prescription, UUID
 
     List<Prescription> findBySessionIdAndType(UUID sessionId, String type);
 
-    @Query("SELECT p FROM Prescription p JOIN p.session s WHERE p.type = 'internal' AND p.status = :status ORDER BY p.createdAt ASC")
+    @Query("SELECT p FROM Prescription p JOIN p.session s WHERE p.type = 'internal' AND p.status = :status AND s.status = 'completed' ORDER BY p.createdAt ASC")
     List<Prescription> findPharmacyQueue(String status);
 }

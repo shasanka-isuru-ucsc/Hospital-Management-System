@@ -11,9 +11,10 @@ info:
     **Direct URL:** `http://localhost:3002`
     
     **NATS events published by this service:**
-    - `billing.events` → `billing.opd` when OPD session completed
-    - `billing.events` → `billing.wound` when wound care session completed
-    - `lab.events` → `lab.requested` when doctor requests lab tests
+    - `BILLING` stream → `billing.opd` when OPD session completed
+    - `BILLING` stream → `billing.wound` when wound care session completed
+    - `LAB` stream → `lab.requested` when doctor requests lab tests
+    - `PHARMACY` stream → `pharmacy.new_rx` when session completed and ≥1 internal prescription exists (intended for WebSocket push to Pharmacy Display)
   version: 1.0.0
 
 servers:
@@ -389,6 +390,56 @@ components:
           type: string
           description: Instructions for the lab technician
 
+    PharmacyNewRxEvent:
+      type: object
+      description: |
+        NATS event payload published to the `PHARMACY` JetStream stream on subject `pharmacy.new_rx`
+        when a session is completed and contains at least one internal prescription.
+        Intended to be consumed by a WebSocket gateway for real-time Pharmacy Display updates.
+        Only internal-type prescriptions are included (external prescriptions go to outside pharmacies).
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+        patientName:
+          type: string
+          example: "Andrea Lalema"
+        doctorName:
+          type: string
+          example: "Dr. Jenny Smith"
+        completedAt:
+          type: string
+          format: date-time
+          example: "2026-03-02T09:15:00"
+        prescriptions:
+          type: array
+          description: Only internal-type prescriptions
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              medicineName:
+                type: string
+                example: "Paracetamol"
+              dosage:
+                type: string
+                example: "500mg"
+              frequency:
+                type: string
+                example: "Every 8 hours"
+              durationDays:
+                type: integer
+                example: 5
+              instructions:
+                type: string
+                nullable: true
+                example: "Take with water after meals"
+
     Error:
       type: object
       properties:
@@ -582,11 +633,13 @@ paths:
       tags: [Sessions]
       summary: Complete a session
       description: |
-        Marks the session as completed. This triggers the billing event:
-        - OPD session → publishes `billing.opd` to NATS → Finance creates invoice automatically
-        - Wound care → publishes `billing.wound` to NATS → Finance creates invoice automatically
-        
+        Marks the session as completed. This triggers the following NATS events:
+        - OPD session → publishes `billing.opd` → Finance creates invoice automatically
+        - Wound care → publishes `billing.wound` → Finance creates invoice automatically
+        - If session has ≥1 internal prescription → publishes `pharmacy.new_rx` → Pharmacy Display is notified in real time via WebSocket push
+
         Session cannot be edited after completion.
+        Pharmacy queue (`GET /pharmacy/queue`) only becomes visible for a session's prescriptions after this call.
       parameters:
         - name: id
           in: path
@@ -1064,7 +1117,14 @@ paths:
       tags: [Pharmacy]
       summary: Get internal pharmacy prescription queue
       description: |
-        Returns all internal prescriptions with status = pending across all today's sessions.
+        Returns internal prescriptions with the given status from **completed sessions only**.
+        Prescriptions from open/ongoing sessions are hidden until the doctor calls
+        `PUT /sessions/{id}/complete` — preventing pharmacists from seeing mid-session
+        prescriptions that the doctor might still change.
+
+        When a session is completed, the `pharmacy.new_rx` NATS event is also published
+        so that the Pharmacy Display can be updated in real time via WebSocket push.
+
         Used by the Pharmacy Display board to show what needs to be dispensed.
       parameters:
         - name: status

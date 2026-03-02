@@ -1,9 +1,11 @@
 package com.hms.clinical.service;
 
 import com.hms.clinical.dto.*;
+import com.hms.clinical.entity.Prescription;
 import com.hms.clinical.entity.Session;
 import com.hms.clinical.event.BillingEvent;
 import com.hms.clinical.event.EventPublisher;
+import com.hms.clinical.event.PharmacyNewRxEvent;
 import com.hms.clinical.exception.BusinessException;
 import com.hms.clinical.exception.ResourceNotFoundException;
 import com.hms.clinical.repository.SessionRepository;
@@ -140,6 +142,34 @@ public class SessionService {
             eventPublisher.publishBillingOpdEvent(billingEvent);
         } else if ("wound_care".equals(saved.getSessionType())) {
             eventPublisher.publishBillingWoundEvent(billingEvent);
+        }
+
+        // Publish pharmacy event for internal prescriptions (only internal type, pending status)
+        List<Prescription> internalRxs = (saved.getPrescriptions() != null)
+                ? saved.getPrescriptions().stream()
+                        .filter(p -> "internal".equals(p.getType()))
+                        .collect(Collectors.toList())
+                : List.of();
+
+        if (!internalRxs.isEmpty()) {
+            PharmacyNewRxEvent pharmacyEvent = PharmacyNewRxEvent.builder()
+                    .sessionId(saved.getId())
+                    .patientId(saved.getPatientId())
+                    .patientName(saved.getPatientName())
+                    .doctorName(saved.getDoctorName())
+                    .completedAt(saved.getCompletedAt())
+                    .prescriptions(internalRxs.stream()
+                            .map(p -> PharmacyNewRxEvent.RxItem.builder()
+                                    .id(p.getId())
+                                    .medicineName(p.getMedicineName())
+                                    .dosage(p.getDosage())
+                                    .frequency(p.getFrequency())
+                                    .durationDays(p.getDurationDays())
+                                    .instructions(p.getInstructions())
+                                    .build())
+                            .collect(Collectors.toList()))
+                    .build();
+            eventPublisher.publishPharmacyNewRxEvent(pharmacyEvent);
         }
 
         return toDto(saved);

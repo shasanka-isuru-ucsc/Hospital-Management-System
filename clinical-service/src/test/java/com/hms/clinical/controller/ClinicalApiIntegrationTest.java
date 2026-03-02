@@ -249,33 +249,17 @@ class ClinicalApiIntegrationTest {
                 .andExpect(jsonPath("$.data[0].type").value("internal"));
     }
 
-    // ───────── PHARMACY TESTS ─────────
+    // ───────── PHARMACY TESTS (before session completion) ─────────
 
     @Test
     @Order(30)
-    void getPharmacyQueue_shouldReturn200() throws Exception {
+    void getPharmacyQueue_beforeCompletion_shouldBeEmpty() throws Exception {
+        // Pharmacy queue only shows prescriptions from COMPLETED sessions.
+        // Session is still open at this point, so queue must be empty.
         mockMvc.perform(get("/pharmacy/queue"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data", hasSize(greaterThanOrEqualTo(1))));
-    }
-
-    @Test
-    @Order(31)
-    void dispensePrescription_shouldReturn200() throws Exception {
-        mockMvc.perform(put("/pharmacy/{rxId}/dispense", prescriptionId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.status").value("dispensed"));
-    }
-
-    @Test
-    @Order(32)
-    void dispensePrescription_alreadyDispensed_shouldReturn422() throws Exception {
-        mockMvc.perform(put("/pharmacy/{rxId}/dispense", prescriptionId))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("UNPROCESSABLE_ENTITY"));
+                .andExpect(jsonPath("$.data", hasSize(0)));
     }
 
     // ───────── LAB REQUEST TESTS ─────────
@@ -336,6 +320,49 @@ class ClinicalApiIntegrationTest {
 
     @Test
     @Order(51)
+    void getPharmacyQueue_afterCompletion_shouldShowInternalPrescriptions() throws Exception {
+        // After session completion, internal pending prescriptions become visible in pharmacy queue.
+        // The pharmacy.new_rx NATS event is also published at this point.
+        mockMvc.perform(get("/pharmacy/queue"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].medicineName").value("Paracetamol"))
+                .andExpect(jsonPath("$.data[0].status").value("pending"))
+                .andExpect(jsonPath("$.data[0].patientName").exists())
+                .andExpect(jsonPath("$.data[0].doctorName").exists());
+    }
+
+    @Test
+    @Order(52)
+    void dispensePrescription_shouldReturn200() throws Exception {
+        mockMvc.perform(put("/pharmacy/{rxId}/dispense", prescriptionId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("dispensed"));
+    }
+
+    @Test
+    @Order(53)
+    void dispensePrescription_alreadyDispensed_shouldReturn422() throws Exception {
+        mockMvc.perform(put("/pharmacy/{rxId}/dispense", prescriptionId))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("UNPROCESSABLE_ENTITY"));
+    }
+
+    @Test
+    @Order(54)
+    void getPharmacyQueue_afterDispense_shouldBeEmpty() throws Exception {
+        // After dispensing all internal prescriptions, pharmacy queue should be empty.
+        mockMvc.perform(get("/pharmacy/queue"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(0)));
+    }
+
+    @Test
+    @Order(55)
     void completeSession_alreadyCompleted_shouldReturn422() throws Exception {
         SessionCompleteRequest request = SessionCompleteRequest.builder()
                 .diagnosis("Test")
@@ -350,7 +377,7 @@ class ClinicalApiIntegrationTest {
     }
 
     @Test
-    @Order(52)
+    @Order(56)
     void updateCompletedSession_shouldReturn422() throws Exception {
         SessionUpdateRequest request = SessionUpdateRequest.builder()
                 .chiefComplaint("Should fail")
@@ -364,7 +391,7 @@ class ClinicalApiIntegrationTest {
     }
 
     @Test
-    @Order(53)
+    @Order(57)
     void addPrescriptionToCompletedSession_shouldReturn422() throws Exception {
         PrescriptionCreateRequest request = PrescriptionCreateRequest.builder()
                 .prescriptions(List.of(
@@ -382,7 +409,7 @@ class ClinicalApiIntegrationTest {
     }
 
     @Test
-    @Order(54)
+    @Order(58)
     void recordVitalsOnCompletedSession_shouldReturn422() throws Exception {
         VitalsCreateRequest request = VitalsCreateRequest.builder().bpm(70).build();
 

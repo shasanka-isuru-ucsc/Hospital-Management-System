@@ -47,4 +47,16 @@ public class EventPublisher {
                     event.getSessionId(), e.getMessage(), e);
         }
     }
+
+    public void publishPharmacyNewRxEvent(PharmacyNewRxEvent event) {
+        try {
+            byte[] payload = objectMapper.writeValueAsBytes(event);
+            jetStream.publish(NatsConfig.SUBJECT_PHARMACY_NEW_RX, payload);
+            log.info("Published pharmacy.new_rx event for session: {} ({} prescriptions)",
+                    event.getSessionId(), event.getPrescriptions().size());
+        } catch (Exception e) {
+            log.error("Failed to publish pharmacy.new_rx event for session {}: {}",
+                    event.getSessionId(), e.getMessage(), e);
+        }
+    }
 }

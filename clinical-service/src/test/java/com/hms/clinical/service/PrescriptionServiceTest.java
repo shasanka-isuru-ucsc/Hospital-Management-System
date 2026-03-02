@@ -160,4 +160,47 @@ class PrescriptionServiceTest {
 
         assertThrows(BusinessException.class, () -> prescriptionService.dispensePrescription(rxId));
     }
+
+    @Test
+    void getPharmacyQueue_DefaultStatus_ShouldQueryPendingFromCompletedSessions() {
+        UUID sessionId = UUID.randomUUID();
+        Session session = new Session();
+        session.setId(sessionId);
+        session.setStatus("completed");
+        session.setPatientName("Patient");
+        session.setDoctorName("Dr. Smith");
+        session.setCreatedAt(LocalDateTime.now());
+
+        Prescription rx = new Prescription();
+        rx.setId(UUID.randomUUID());
+        rx.setSession(session);
+        rx.setType("internal");
+        rx.setMedicineName("Paracetamol");
+        rx.setDosage("500mg");
+        rx.setFrequency("3x daily");
+        rx.setDurationDays(5);
+        rx.setStatus("pending");
+
+        when(prescriptionRepository.findPharmacyQueue("pending")).thenReturn(List.of(rx));
+
+        List<PrescriptionDto> result = prescriptionService.getPharmacyQueue(null);
+
+        assertEquals(1, result.size());
+        assertEquals("Paracetamol", result.get(0).getMedicineName());
+        assertEquals("Patient", result.get(0).getPatientName());
+        assertEquals("Dr. Smith", result.get(0).getDoctorName());
+        verify(prescriptionRepository, times(1)).findPharmacyQueue("pending");
+    }
+
+    @Test
+    void getPharmacyQueue_OpenSessionPrescriptions_ShouldNotAppear() {
+        // Repository query filters by s.status = 'completed', so open-session prescriptions
+        // are excluded at the query level. This test verifies service returns empty when
+        // repository returns empty (simulating no completed-session results).
+        when(prescriptionRepository.findPharmacyQueue("pending")).thenReturn(List.of());
+
+        List<PrescriptionDto> result = prescriptionService.getPharmacyQueue("pending");
+
+        assertTrue(result.isEmpty());
+    }
 }

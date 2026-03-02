@@ -445,7 +445,7 @@ GET {{baseUrl}}/patients/a1b2c3d4-0000-0000-0000-111111111111/history?page=1&lim
 Authorization: Bearer {{adminToken}}
 
 # ──────────────────────────────────────────────────────────────────────────────
-# CLINICAL_REQUEST ORDER (simulating RabbitMQ event via manual API call)
+# CLINICAL_REQUEST ORDER (simulating NATS event via manual API call)
 # In production this is auto-created when clinical service publishes lab.requested
 # ──────────────────────────────────────────────────────────────────────────────
 
