@@ -135,7 +135,7 @@ Authorization: Bearer {{adminToken}}
 
 ### 12. Get First Available Bed ID (for testing)
 # Run GET /beds?ward_id={{maleWardId}}&status=available and copy an ID here
-@bedId = 00000000-0000-0000-0000-000000000001
+@bedId = ba8b0328-1d6c-4302-a347-bfba7f5f66c6
 
 ###
 
