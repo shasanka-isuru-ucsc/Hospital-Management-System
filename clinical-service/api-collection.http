@@ -141,7 +141,8 @@ GET http://localhost:3002/pharmacy/queue
 ###
 
 # Prescription ID
-@rxId = 087d6e85-7f8f-4d7e-892e-9efd250238fd
+# Update this id manually based on the queue details
+@rxId = 9f8b077d-92c7-4a5e-8660-94b323b20cf6
 
 ### Dispense prescription
 PUT http://localhost:3002/pharmacy/{{rxId}}/dispense

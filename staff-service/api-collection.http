@@ -61,7 +61,7 @@ Content-Type: {{contentType}}
 
 ### 6. Update department — set description
 # Replace DEPT_ID with actual department UUID from step 2
-@deptId = DEPT_ID_HERE
+@deptId = 4c839171-d1b7-444b-94c5-67154e1cf691
 
 PUT {{baseUrl}}/departments/{{deptId}}
 Content-Type: {{contentType}}
@@ -148,7 +148,7 @@ Content-Type: {{contentType}}
 
 ### 14. Get doctor by ID
 # Replace DOCTOR_ID with actual doctor UUID
-@doctorId = DOCTOR_ID_HERE
+@doctorId = a8db1e07-6814-48f3-bf92-5e178d81cbc6
 
 GET {{baseUrl}}/doctors/{{doctorId}}
 Content-Type: {{contentType}}
@@ -259,7 +259,7 @@ Content-Type: {{contentType}}
 
 ### 26. Update schedule entry
 # Replace SCHEDULE_ID with UUID from step 18
-@scheduleId = SCHEDULE_ID_HERE
+@scheduleId = d268d5b9-b1f3-48c7-9eb0-23f0ff1991c8
 
 PUT {{baseUrl}}/schedules/{{scheduleId}}
 Content-Type: {{contentType}}
@@ -365,8 +365,8 @@ Content-Type: {{contentType}}
 X-User-Name: admin
 
 {
-  "nurse_id": "NURSE_ID_HERE",
-  "doctor_id": "DOCTOR_ID_HERE",
+  "nurse_id": "f7d47d65-f05b-4b2c-9166-6c3c61cdd4b4",
+  "doctor_id": "a8db1e07-6814-48f3-bf92-5e178d81cbc6",
   "session_date": "2026-03-10"
 }
 

@@ -1,6 +1,8 @@
+com/hms/staff/StaffServiceApplicationTests.class
 com/hms/staff/service/DepartmentServiceTest.class
 com/hms/staff/service/DoctorServiceTest.class
 com/hms/staff/service/NurseAllocationServiceTest.class
 com/hms/staff/service/ScheduleServiceTest.class
 com/hms/staff/controller/DepartmentControllerTest.class
 com/hms/staff/controller/DoctorControllerTest.class
+com/hms/staff/integration/StaffServiceE2ETest.class

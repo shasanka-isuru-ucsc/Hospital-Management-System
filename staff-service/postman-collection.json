@@ -1,0 +1,780 @@
+{
+  "info": {
+    "name": "HMS — Staff Service",
+    "description": "API collection for the HMS Staff Service (port 3003). Covers Departments, Doctors, Schedules, Staff Members, and Nurse Allocations.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",      "value": "http://localhost:3003", "type": "string" },
+    { "key": "deptId",       "value": "DEPT_ID_HERE",          "type": "string" },
+    { "key": "doctorId",     "value": "DOCTOR_ID_HERE",        "type": "string" },
+    { "key": "scheduleId",   "value": "SCHEDULE_ID_HERE",      "type": "string" },
+    { "key": "nurseId",      "value": "NURSE_ID_HERE",         "type": "string" },
+    { "key": "allocationId", "value": "ALLOCATION_ID_HERE",    "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Departments",
+      "item": [
+        {
+          "name": "1. List all departments",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/departments",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments"]
+            }
+          }
+        },
+        {
+          "name": "2. Create department — Cardiology",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cardiology\",\n  \"description\": \"Heart and cardiovascular care\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/departments",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments"]
+            }
+          }
+        },
+        {
+          "name": "3. Create department — Neurology",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Neurology\",\n  \"description\": \"Brain and nervous system disorders\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/departments",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments"]
+            }
+          }
+        },
+        {
+          "name": "4. Create department — General Physician",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"General Physician\",\n  \"description\": \"Primary care and general medicine\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/departments",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments"]
+            }
+          }
+        },
+        {
+          "name": "5. Create department — duplicate name (expect 409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cardiology\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/departments",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments"]
+            }
+          }
+        },
+        {
+          "name": "6. Update department — set description",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated: Advanced cardiovascular care and interventional cardiology\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/departments/{{deptId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments", "{{deptId}}"]
+            }
+          }
+        },
+        {
+          "name": "7. Deactivate department",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/departments/{{deptId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments", "{{deptId}}"]
+            }
+          }
+        },
+        {
+          "name": "8. Delete department (expect 422 if active doctors assigned)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/departments/{{deptId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["departments", "{{deptId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Doctors",
+      "item": [
+        {
+          "name": "9. List all doctors",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/doctors",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors"]
+            }
+          }
+        },
+        {
+          "name": "10. List doctors filtered by department",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/doctors?department_id={{deptId}}&status=active",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors"],
+              "query": [
+                { "key": "department_id", "value": "{{deptId}}" },
+                { "key": "status",        "value": "active" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "11. List doctors with search",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/doctors?search=jenny&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors"],
+              "query": [
+                { "key": "search", "value": "jenny" },
+                { "key": "page",   "value": "1" },
+                { "key": "limit",  "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "12. Create doctor — Jenny Smith (multipart)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "first_name",   "value": "Jenny",                              "type": "text" },
+                { "key": "last_name",    "value": "Smith",                              "type": "text" },
+                { "key": "username",     "value": "dr.jennysmith",                      "type": "text" },
+                { "key": "email",        "value": "jenny.smith@hospital.com",            "type": "text" },
+                { "key": "mobile",       "value": "+94771234567",                        "type": "text" },
+                { "key": "password",     "value": "Password@123",                        "type": "text" },
+                { "key": "date_of_birth","value": "1985-05-20",                          "type": "text" },
+                { "key": "gender",       "value": "female",                              "type": "text" },
+                { "key": "education",    "value": "MBBS, MS",                            "type": "text" },
+                { "key": "designation",  "value": "Senior Physician",                    "type": "text" },
+                { "key": "department_id","value": "{{deptId}}",                          "type": "text" },
+                { "key": "biography",    "value": "Experienced cardiologist with 15 years of practice.", "type": "text" },
+                { "key": "address",      "value": "123 Medical St",                      "type": "text" },
+                { "key": "city",         "value": "Colombo",                             "type": "text" },
+                { "key": "country",      "value": "Sri Lanka",                           "type": "text" },
+                { "key": "avatar",       "value": "",  "type": "file", "disabled": true, "description": "Optional avatar image" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/doctors",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors"]
+            }
+          }
+        },
+        {
+          "name": "13. Create doctor — John Doe (multipart)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "first_name",   "value": "John",                    "type": "text" },
+                { "key": "last_name",    "value": "Doe",                     "type": "text" },
+                { "key": "username",     "value": "dr.johndoe",              "type": "text" },
+                { "key": "email",        "value": "john.doe@hospital.com",   "type": "text" },
+                { "key": "mobile",       "value": "+94770000001",             "type": "text" },
+                { "key": "password",     "value": "Password@123",             "type": "text" },
+                { "key": "date_of_birth","value": "1978-08-15",               "type": "text" },
+                { "key": "gender",       "value": "male",                    "type": "text" },
+                { "key": "education",    "value": "MBBS, MD",                "type": "text" },
+                { "key": "designation",  "value": "Consultant Physician",    "type": "text" },
+                { "key": "department_id","value": "{{deptId}}",              "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/doctors",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors"]
+            }
+          }
+        },
+        {
+          "name": "14. Get doctor by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors", "{{doctorId}}"]
+            }
+          }
+        },
+        {
+          "name": "15. Get doctor — not found (expect 404)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/doctors/00000000-0000-0000-0000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors", "00000000-0000-0000-0000-000000000000"]
+            }
+          }
+        },
+        {
+          "name": "16. Update doctor (multipart)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "designation", "value": "Chief Cardiologist",      "type": "text" },
+                { "key": "biography",   "value": "Updated biography text",  "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors", "{{doctorId}}"]
+            }
+          }
+        },
+        {
+          "name": "17. Deactivate doctor (soft-delete + Keycloak disable)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors", "{{doctorId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Schedules",
+      "item": [
+        {
+          "name": "18. Add Monday schedule (08:00–12:00, 15-min slots)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"day_of_week\": 1,\n  \"start_time\": \"08:00\",\n  \"end_time\": \"12:00\",\n  \"slot_duration_minutes\": 15,\n  \"max_patients\": 16\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}/schedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors", "{{doctorId}}", "schedule"]
+            }
+          }
+        },
+        {
+          "name": "19. Add Wednesday schedule (14:00–17:00, 20-min slots)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"day_of_week\": 3,\n  \"start_time\": \"14:00\",\n  \"end_time\": \"17:00\",\n  \"slot_duration_minutes\": 20,\n  \"max_patients\": 9\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}/schedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors", "{{doctorId}}", "schedule"]
+            }
+          }
+        },
+        {
+          "name": "20. Add Friday schedule (09:00–13:00, 30-min slots)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"day_of_week\": 5,\n  \"start_time\": \"09:00\",\n  \"end_time\": \"13:00\",\n  \"slot_duration_minutes\": 30,\n  \"max_patients\": 8\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}/schedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors", "{{doctorId}}", "schedule"]
+            }
+          }
+        },
+        {
+          "name": "21. Add schedule — invalid time range (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"day_of_week\": 2,\n  \"start_time\": \"12:00\",\n  \"end_time\": \"08:00\",\n  \"slot_duration_minutes\": 15,\n  \"max_patients\": 10\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}/schedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors", "{{doctorId}}", "schedule"]
+            }
+          }
+        },
+        {
+          "name": "22. Get doctor schedule",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}/schedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors", "{{doctorId}}", "schedule"]
+            }
+          }
+        },
+        {
+          "name": "23. Get availability — Monday 2026-03-02",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}/availability?date=2026-03-02",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors", "{{doctorId}}", "availability"],
+              "query": [{ "key": "date", "value": "2026-03-02" }]
+            }
+          }
+        },
+        {
+          "name": "24. Get availability — Wednesday 2026-03-04",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}/availability?date=2026-03-04",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors", "{{doctorId}}", "availability"],
+              "query": [{ "key": "date", "value": "2026-03-04" }]
+            }
+          }
+        },
+        {
+          "name": "25. Get availability — no schedule day Tuesday (expect 404)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/doctors/{{doctorId}}/availability?date=2026-03-03",
+              "host": ["{{baseUrl}}"],
+              "path": ["doctors", "{{doctorId}}", "availability"],
+              "query": [{ "key": "date", "value": "2026-03-03" }]
+            }
+          }
+        },
+        {
+          "name": "26. Update schedule entry",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"max_patients\": 20,\n  \"slot_duration_minutes\": 10\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/schedules/{{scheduleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedules", "{{scheduleId}}"]
+            }
+          }
+        },
+        {
+          "name": "27. Deactivate schedule entry",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_active\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/schedules/{{scheduleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedules", "{{scheduleId}}"]
+            }
+          }
+        },
+        {
+          "name": "28. Delete schedule entry",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/schedules/{{scheduleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["schedules", "{{scheduleId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Staff Members",
+      "item": [
+        {
+          "name": "29. Create nurse — Sarah Williams",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Sarah Williams\",\n  \"role\": \"nurse\",\n  \"email\": \"sarah.williams@hospital.com\",\n  \"mobile\": \"+94779876543\",\n  \"status\": \"active\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/staff",
+              "host": ["{{baseUrl}}"],
+              "path": ["staff"]
+            }
+          }
+        },
+        {
+          "name": "30. Create nurse — Michael Chen",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Michael Chen\",\n  \"role\": \"nurse\",\n  \"email\": \"michael.chen@hospital.com\",\n  \"mobile\": \"+94778765432\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/staff",
+              "host": ["{{baseUrl}}"],
+              "path": ["staff"]
+            }
+          }
+        },
+        {
+          "name": "31. Create receptionist — Alice Johnson",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Alice Johnson\",\n  \"role\": \"receptionist\",\n  \"email\": \"alice@hospital.com\",\n  \"mobile\": \"+94775555000\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/staff",
+              "host": ["{{baseUrl}}"],
+              "path": ["staff"]
+            }
+          }
+        },
+        {
+          "name": "32. List all staff members",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/staff",
+              "host": ["{{baseUrl}}"],
+              "path": ["staff"]
+            }
+          }
+        },
+        {
+          "name": "33. Get staff member by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/staff/{{nurseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["staff", "{{nurseId}}"]
+            }
+          }
+        },
+        {
+          "name": "34. Get available nurses on a date",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/staff/available?date=2026-03-10&role=nurse",
+              "host": ["{{baseUrl}}"],
+              "path": ["staff", "available"],
+              "query": [
+                { "key": "date", "value": "2026-03-10" },
+                { "key": "role", "value": "nurse" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Nurse Allocations",
+      "item": [
+        {
+          "name": "35. List all allocations",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/nurse-allocations",
+              "host": ["{{baseUrl}}"],
+              "path": ["nurse-allocations"]
+            }
+          }
+        },
+        {
+          "name": "36. Allocate Sarah to doctor on March 10",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Name",  "value": "admin" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nurse_id\": \"{{nurseId}}\",\n  \"doctor_id\": \"{{doctorId}}\",\n  \"session_date\": \"2026-03-10\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/nurse-allocations",
+              "host": ["{{baseUrl}}"],
+              "path": ["nurse-allocations"]
+            }
+          }
+        },
+        {
+          "name": "37. Allocate same nurse again same date (expect 422 NURSE_ALREADY_ALLOCATED)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nurse_id\": \"NURSE_ID_HERE\",\n  \"doctor_id\": \"DOCTOR_ID_HERE\",\n  \"session_date\": \"2026-03-10\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/nurse-allocations",
+              "host": ["{{baseUrl}}"],
+              "path": ["nurse-allocations"]
+            }
+          }
+        },
+        {
+          "name": "38. Get available nurses — Sarah should be gone (allocated on March 10)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/staff/available?date=2026-03-10&role=nurse",
+              "host": ["{{baseUrl}}"],
+              "path": ["staff", "available"],
+              "query": [
+                { "key": "date", "value": "2026-03-10" },
+                { "key": "role", "value": "nurse" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "39. Allocate Michael on different date (allowed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-User-Name",  "value": "receptionist1" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nurse_id\": \"MICHAEL_ID_HERE\",\n  \"doctor_id\": \"{{doctorId}}\",\n  \"session_date\": \"2026-03-12\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/nurse-allocations",
+              "host": ["{{baseUrl}}"],
+              "path": ["nurse-allocations"]
+            }
+          }
+        },
+        {
+          "name": "40. Filter allocations by doctor",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/nurse-allocations?doctor_id={{doctorId}}&status=active",
+              "host": ["{{baseUrl}}"],
+              "path": ["nurse-allocations"],
+              "query": [
+                { "key": "doctor_id", "value": "{{doctorId}}" },
+                { "key": "status",    "value": "active" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "41. Filter allocations by date",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/nurse-allocations?date=2026-03-10",
+              "host": ["{{baseUrl}}"],
+              "path": ["nurse-allocations"],
+              "query": [{ "key": "date", "value": "2026-03-10" }]
+            }
+          }
+        },
+        {
+          "name": "42. Complete an allocation",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/nurse-allocations/{{allocationId}}/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["nurse-allocations", "{{allocationId}}", "complete"]
+            }
+          }
+        },
+        {
+          "name": "43. Complete already completed allocation (expect 422)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/nurse-allocations/{{allocationId}}/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["nurse-allocations", "{{allocationId}}", "complete"]
+            }
+          }
+        },
+        {
+          "name": "44. Get available nurses — Sarah is free again after completion",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/staff/available?date=2026-03-10&role=nurse",
+              "host": ["{{baseUrl}}"],
+              "path": ["staff", "available"],
+              "query": [
+                { "key": "date", "value": "2026-03-10" },
+                { "key": "role", "value": "nurse" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "45. Allocate nurse to non-existent doctor (expect 404)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nurse_id\": \"NURSE_ID_HERE\",\n  \"doctor_id\": \"00000000-0000-0000-0000-000000000000\",\n  \"session_date\": \"2026-03-15\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/nurse-allocations",
+              "host": ["{{baseUrl}}"],
+              "path": ["nurse-allocations"]
+            }
+          }
+        },
+        {
+          "name": "46. Cancel an allocation",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/nurse-allocations/{{allocationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["nurse-allocations", "{{allocationId}}"]
+            }
+          }
+        },
+        {
+          "name": "47. Cancel already completed allocation (expect 422)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/nurse-allocations/{{allocationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["nurse-allocations", "{{allocationId}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
