@@ -57,7 +57,7 @@ Content-Type: application/json
 
 {
   "name": "Complete Blood Count",
-  "code": "CBC",
+  "code": "CBC1",
   "category": "Haematology",
   "unitPrice": 750.00,
   "turnaroundHours": 4,
@@ -77,7 +77,7 @@ Content-Type: application/json
 
 {
   "name": "Widal Test",
-  "code": "WIDAL",
+  "code": "WIDAL1",
   "category": "Microbiology",
   "unitPrice": 500.00,
   "turnaroundHours": 24,
@@ -459,7 +459,7 @@ Content-Type: application/json
 {
   "patientId": "a1b2c3d4-0000-0000-0000-111111111111",
   "patientName": "Andrea Lalema",
-  "sessionId": "s1e2s3s4-0000-0000-0000-000000000001",
+  "sessionId": "a1e2a3a4-0000-0000-0000-000000000001",
   "source": "clinical_request",
   "tests": [
     {
@@ -485,7 +485,7 @@ Content-Type: application/json
 
 {
   "patientName": "Andrea Lalema",
-  "sessionId": "s1e2s3s4-0000-0000-0000-000000000001",
+  "sessionId": "a1e2a3a4-0000-0000-0000-000000000001",
   "source": "clinical_request",
   "tests": [
     {
