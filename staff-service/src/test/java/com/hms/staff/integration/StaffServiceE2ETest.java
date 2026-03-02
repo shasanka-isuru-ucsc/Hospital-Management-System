@@ -319,7 +319,7 @@ class StaffServiceE2ETest {
     void updateScheduleEntry_success() throws Exception {
         mockMvc.perform(put("/schedules/{id}", createdScheduleId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"maxPatients\": 20}"))
+                        .content("{\"max_patients\": 20}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.maxPatients").value(20));
     }
