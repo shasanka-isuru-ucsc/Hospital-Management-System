@@ -12,6 +12,7 @@ import io.nats.client.Dispatcher;
 import io.nats.client.JetStream;
 import io.nats.client.Message;
 import io.nats.client.PushSubscribeOptions;
+import io.nats.client.api.ConsumerConfiguration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -44,22 +45,30 @@ public class BillingEventConsumer {
             jetStream.subscribe(NatsConfig.SUBJECT_BILLING_OPD, dispatcher,
                     msg -> handleMessage(msg, BillingOpdEvent.class, this::handleBillingOpd),
                     false,
-                    PushSubscribeOptions.builder().durable("finance-billing-opd").build());
+                    PushSubscribeOptions.builder().durable("finance-billing-opd")
+                            .configuration(ConsumerConfiguration.builder()
+                                    .filterSubject(NatsConfig.SUBJECT_BILLING_OPD).build()).build());
 
             jetStream.subscribe(NatsConfig.SUBJECT_BILLING_WOUND, dispatcher,
                     msg -> handleMessage(msg, BillingWoundEvent.class, this::handleBillingWound),
                     false,
-                    PushSubscribeOptions.builder().durable("finance-billing-wound").build());
+                    PushSubscribeOptions.builder().durable("finance-billing-wound")
+                            .configuration(ConsumerConfiguration.builder()
+                                    .filterSubject(NatsConfig.SUBJECT_BILLING_WOUND).build()).build());
 
             jetStream.subscribe(NatsConfig.SUBJECT_BILLING_WARD, dispatcher,
                     msg -> handleMessage(msg, BillingWardEvent.class, this::handleBillingWard),
                     false,
-                    PushSubscribeOptions.builder().durable("finance-billing-ward").build());
+                    PushSubscribeOptions.builder().durable("finance-billing-ward")
+                            .configuration(ConsumerConfiguration.builder()
+                                    .filterSubject(NatsConfig.SUBJECT_BILLING_WARD).build()).build());
 
             jetStream.subscribe(NatsConfig.SUBJECT_BILLING_LAB, dispatcher,
                     msg -> handleMessage(msg, BillingLabEvent.class, this::handleBillingLab),
                     false,
-                    PushSubscribeOptions.builder().durable("finance-billing-lab").build());
+                    PushSubscribeOptions.builder().durable("finance-billing-lab")
+                            .configuration(ConsumerConfiguration.builder()
+                                    .filterSubject(NatsConfig.SUBJECT_BILLING_LAB).build()).build());
 
             log.info("Finance service subscribed to all billing NATS subjects");
         } catch (Exception e) {

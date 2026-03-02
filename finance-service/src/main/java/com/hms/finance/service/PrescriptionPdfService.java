@@ -47,7 +47,7 @@ public class PrescriptionPdfService {
         // Minimal PDF structure (plain text placeholder)
         // In production, use iText or Apache PDFBox with real prescription data
         String content = """
-                %PDF-1.4
+                %%PDF-1.4
                 1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
                 2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
                 3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]
