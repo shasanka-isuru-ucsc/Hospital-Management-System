@@ -1,0 +1,150 @@
+server:
+  port: ${PORT:3000}
+
+spring:
+  application:
+    name: hms-gateway
+
+  # ── Redis (rate limiting) ─────────────────────────────────────────────────
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+
+  # ── Spring Cloud Gateway routes ───────────────────────────────────────────
+  # Routes are evaluated TOP-TO-BOTTOM — most specific predicates must come first.
+  # JWT validation + RBAC are handled by GlobalFilters, not here.
+  cloud:
+    gateway:
+      routes:
+
+        # ── Clinical: specific /patients sub-paths (before generic /patients/**) ─
+        - id: patients-vitals-history
+          uri: ${CLINICAL_URL:http://localhost:3002}
+          predicates:
+            - Path=/patients/*/vitals-history
+
+        - id: patients-history
+          uri: ${CLINICAL_URL:http://localhost:3002}
+          predicates:
+            - Path=/patients/*/history
+
+        # ── Ward: patient admission history ───────────────────────────────────
+        - id: patients-admissions
+          uri: ${WARD_URL:http://localhost:3006}
+          predicates:
+            - Path=/patients/*/admissions
+
+        # ── Reception service ─────────────────────────────────────────────────
+        - id: patients
+          uri: ${RECEPTION_URL:http://localhost:3001}
+          predicates:
+            - Path=/patients/**
+
+        - id: tokens
+          uri: ${RECEPTION_URL:http://localhost:3001}
+          predicates:
+            - Path=/tokens/**
+
+        - id: queue
+          uri: ${RECEPTION_URL:http://localhost:3001}
+          predicates:
+            - Path=/queue/**
+
+        - id: appointments
+          uri: ${RECEPTION_URL:http://localhost:3001}
+          predicates:
+            - Path=/appointments/**
+
+        # ── Clinical service ──────────────────────────────────────────────────
+        - id: sessions
+          uri: ${CLINICAL_URL:http://localhost:3002}
+          predicates:
+            - Path=/sessions/**
+
+        - id: pharmacy
+          uri: ${CLINICAL_URL:http://localhost:3002}
+          predicates:
+            - Path=/pharmacy/**
+
+        # ── Staff service ─────────────────────────────────────────────────────
+        - id: doctors
+          uri: ${STAFF_URL:http://localhost:3003}
+          predicates:
+            - Path=/doctors/**
+
+        - id: departments
+          uri: ${STAFF_URL:http://localhost:3003}
+          predicates:
+            - Path=/departments/**
+
+        - id: schedules
+          uri: ${STAFF_URL:http://localhost:3003}
+          predicates:
+            - Path=/schedules/**
+
+        - id: nurse-allocations
+          uri: ${STAFF_URL:http://localhost:3003}
+          predicates:
+            - Path=/nurse-allocations/**
+
+        - id: staff
+          uri: ${STAFF_URL:http://localhost:3003}
+          predicates:
+            - Path=/staff/**
+
+        # ── Finance service ───────────────────────────────────────────────────
+        - id: invoices
+          uri: ${FINANCE_URL:http://localhost:3004}
+          predicates:
+            - Path=/invoices/**
+
+        - id: reports
+          uri: ${FINANCE_URL:http://localhost:3004}
+          predicates:
+            - Path=/reports/**
+
+        - id: prescriptions
+          uri: ${FINANCE_URL:http://localhost:3004}
+          predicates:
+            - Path=/prescriptions/**
+
+        # ── Lab service ───────────────────────────────────────────────────────
+        - id: tests
+          uri: ${LAB_URL:http://localhost:3005}
+          predicates:
+            - Path=/tests/**
+
+        - id: orders
+          uri: ${LAB_URL:http://localhost:3005}
+          predicates:
+            - Path=/orders/**
+
+        # ── Ward service ──────────────────────────────────────────────────────
+        - id: wards
+          uri: ${WARD_URL:http://localhost:3006}
+          predicates:
+            - Path=/wards/**
+
+        - id: beds
+          uri: ${WARD_URL:http://localhost:3006}
+          predicates:
+            - Path=/beds/**
+
+        - id: admissions
+          uri: ${WARD_URL:http://localhost:3006}
+          predicates:
+            - Path=/admissions/**
+
+# ── Keycloak JWKS endpoint for JWT public-key validation ──────────────────────
+# Clients authenticate directly with Keycloak at port 8080 — not through the gateway.
+# The gateway only validates the resulting token using Keycloak's public key.
+keycloak:
+  jwks-uri: ${KEYCLOAK_JWKS_URI:http://localhost:8080/realms/hms/protocol/openid-connect/certs}
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%logger{36}] - %msg%n"
+  level:
+    com.hms.gateway: INFO
+    org.springframework.cloud.gateway: WARN

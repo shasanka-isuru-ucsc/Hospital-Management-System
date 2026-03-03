@@ -19,7 +19,7 @@ services:
   nats:
     image: nats:2.10-alpine
     container_name: hms-nats
-    command: "-js"
+    command: "-js -m 8222"
     ports:
       - "4222:4222"
       - "8222:8222"
@@ -47,6 +47,17 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: hms-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   keycloak:
     image: quay.io/keycloak/keycloak:23.0
     container_name: hms-keycloak
@@ -56,13 +67,15 @@ services:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       KC_DB: dev-file
+      KC_HEALTH_ENABLED: "true"
     command: start-dev
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      # ubi9-minimal (Keycloak's base image) has no curl — use bash /dev/tcp instead
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080"]
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 30s
+      start_period: 60s
 
 volumes:
   postgres_data:
