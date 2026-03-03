@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +44,21 @@ public class PatientService {
     }
 
     public Page<Patient> getAllPatients(String search, String status, Pageable pageable) {
-        Page<Patient> patients = patientRepository.findAllByFilters(search, status, pageable);
+        Specification<Patient> spec = Specification.where(null);
+
+        if (status != null && !status.isBlank()) {
+            spec = spec.and((root, q, cb) -> cb.equal(root.get("status"), status));
+        }
+        if (search != null && !search.isBlank()) {
+            String pattern = "%" + search.toLowerCase() + "%";
+            spec = spec.and((root, q, cb) -> cb.or(
+                    cb.like(cb.lower(root.get("firstName")), pattern),
+                    cb.like(cb.lower(root.get("lastName")),  pattern),
+                    cb.like(root.get("mobile"), "%" + search + "%")
+            ));
+        }
+
+        Page<Patient> patients = patientRepository.findAll(spec, pageable);
         patients.forEach(this::enrichWithPresignedUrl);
         return patients;
     }

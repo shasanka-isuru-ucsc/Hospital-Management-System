@@ -1,0 +1,699 @@
+openapi: 3.0.3
+info:
+  title: HMS — API Gateway
+  description: |
+    The API Gateway is the **single entry point** for all HMS client requests (port 3000).
+    Every request (except `GET /health`) must carry a valid Keycloak JWT in the
+    `Authorization: Bearer <token>` header.
+
+    ## Request pipeline
+
+    ```
+    Client Request
+      │
+      ▼
+    [1] AdminAuthFilter  — protects /admin/** (WebFilter, runs for all requests)
+      │
+      ▼
+    [2] RateLimitFilter  — 100 req/min per IP (Redis counter)
+      │
+      ▼
+    [3] JwtAuthenticationFilter
+          a. Match path against RBAC rules → 404 if unrecognised path
+          b. Extract Bearer token          → 401 if missing / malformed
+          c. Validate via Keycloak JWKS    → 401 if invalid / expired
+          d. Extract HMS role              → 401 if no recognised role
+          e. RBAC check                    → 403 if role not allowed
+          f. Inject X-User-Id / X-User-Role / X-User-Name
+          g. Strip Authorization header
+          h. Forward to microservice
+    ```
+
+    ## Headers injected into upstream services
+
+    The gateway injects the following headers on every authenticated request.
+    **Do not send these manually — the gateway overwrites them.**
+
+    | Header | Value |
+    |--------|-------|
+    | `X-User-Id` | Keycloak user UUID (`sub` claim) |
+    | `X-User-Role` | First HMS role found in `realm_access.roles[]` |
+    | `X-User-Name` | Full name (`name` claim) or `preferred_username` fallback |
+
+    ## Authentication — how to get a token
+
+    Call Keycloak **directly** (not through the gateway):
+
+    ```
+    POST http://localhost:8080/realms/hms/protocol/openid-connect/token
+    Content-Type: application/x-www-form-urlencoded
+
+    grant_type=password&client_id=hms-client&username=admin&password=Password@123
+    ```
+
+    Tokens expire after **5 minutes**. Use the `access_token` from the response.
+
+    ## Seed accounts (password: `Password@123`)
+
+    | Username | Role |
+    |----------|------|
+    | `admin` | admin |
+    | `dr.smith` | doctor |
+    | `nurse.silva` | nurse |
+    | `reception1` | receptionist |
+    | `labtech1` | lab_tech |
+    | `ward.staff1` | ward_staff |
+
+    ## Route table
+
+    | Path prefix | Upstream service | Port |
+    |---|---|---|
+    | `/patients/*/vitals-history` | clinical-service | 3002 |
+    | `/patients/*/history` | clinical-service | 3002 |
+    | `/patients/*/admissions` | ward-service | 3006 |
+    | `/patients/**` | reception-service | 3001 |
+    | `/tokens/**` | reception-service | 3001 |
+    | `/queue/**` | reception-service | 3001 |
+    | `/appointments/**` | reception-service | 3001 |
+    | `/sessions/**` | clinical-service | 3002 |
+    | `/pharmacy/**` | clinical-service | 3002 |
+    | `/doctors/**` | staff-service | 3003 |
+    | `/departments/**` | staff-service | 3003 |
+    | `/schedules/**` | staff-service | 3003 |
+    | `/nurse-allocations/**` | staff-service | 3003 |
+    | `/staff/**` | staff-service | 3003 |
+    | `/invoices/**` | finance-service | 3004 |
+    | `/reports/**` | finance-service | 3004 |
+    | `/prescriptions/**` | finance-service | 3004 |
+    | `/tests/**` | lab-service | 3005 |
+    | `/orders/**` | lab-service | 3005 |
+    | `/wards/**` | ward-service | 3006 |
+    | `/beds/**` | ward-service | 3006 |
+    | `/admissions/**` | ward-service | 3006 |
+
+  version: 1.0.0
+  contact:
+    name: HMS MSc Project
+
+servers:
+  - url: http://localhost:3000
+    description: API Gateway (always use this)
+  - url: http://localhost:8080
+    description: Keycloak (auth only — login endpoint)
+
+tags:
+  - name: Auth
+    description: Keycloak login — call directly, not through the gateway
+  - name: Health
+    description: Gateway health check (public, no token required)
+  - name: Admin — RBAC Rules
+    description: |
+      Manage route-to-role access rules at runtime — no gateway restart required.
+      Rules are stored in Redis and served from an in-memory cache.
+      All endpoints require an **admin** JWT.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+
+    # ── Auth ───────────────────────────────────────────────────────────────────
+
+    TokenRequest:
+      type: object
+      required: [grant_type, client_id, username, password]
+      properties:
+        grant_type:
+          type: string
+          enum: [password]
+          example: password
+        client_id:
+          type: string
+          example: hms-client
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          example: "Password@123"
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT — include in Authorization header for all gateway requests
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          description: Seconds until the token expires (default 300 = 5 minutes)
+          example: 300
+        refresh_token:
+          type: string
+
+    # ── Health ─────────────────────────────────────────────────────────────────
+
+    HealthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            status:
+              type: string
+              example: ok
+            service:
+              type: string
+              example: hms-gateway
+
+    # ── RBAC ───────────────────────────────────────────────────────────────────
+
+    RouteRule:
+      type: object
+      properties:
+        index:
+          type: integer
+          description: Zero-based position in the rule list. Use this in PUT / DELETE calls.
+          example: 3
+        pattern:
+          type: string
+          description: |
+            Ant-style path pattern. Evaluated top-to-bottom — first match wins.
+            Place more specific patterns (e.g. /patients/*/history) before broader ones (/patients/**).
+          example: "/patients/**"
+        allowedRoles:
+          type: array
+          items:
+            type: string
+            enum: [admin, doctor, nurse, receptionist, lab_tech, ward_staff]
+          example: [admin, receptionist, doctor, nurse]
+
+    AddRuleRequest:
+      type: object
+      required: [pattern, allowedRoles]
+      properties:
+        pattern:
+          type: string
+          example: "/reports/**"
+          description: Ant-style path pattern
+        allowedRoles:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: [admin, doctor, nurse, receptionist, lab_tech, ward_staff]
+          example: [admin, doctor]
+        position:
+          type: integer
+          description: |
+            Insertion index (zero-based). Omit or use -1 to append at the end.
+            If a rule with the same pattern already exists it is removed first.
+          example: 0
+
+    UpdateRuleRequest:
+      type: object
+      required: [allowedRoles]
+      properties:
+        allowedRoles:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: [admin, doctor, nurse, receptionist, lab_tech, ward_staff]
+          example: [admin, doctor, nurse]
+
+    RulesResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Rule added"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/RouteRule'
+
+    # ── Errors ─────────────────────────────────────────────────────────────────
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            message:
+              type: string
+              example: "Authorization header missing or malformed"
+            statusCode:
+              type: integer
+              example: 401
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  # ── Auth (Keycloak — call directly, NOT through gateway) ───────────────────
+
+  /realms/hms/protocol/openid-connect/token:
+    post:
+      tags: [Auth]
+      summary: Get access token
+      description: |
+        Login with username + password and receive a Keycloak JWT.
+
+        **Call this on port 8080 directly — NOT through the gateway (port 3000).**
+
+        Use the returned `access_token` in the `Authorization: Bearer <token>` header
+        for all gateway requests. Tokens expire after 5 minutes.
+      servers:
+        - url: http://localhost:8080
+          description: Keycloak (direct)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+            examples:
+              admin:
+                summary: Login as admin
+                value:
+                  grant_type: password
+                  client_id: hms-client
+                  username: admin
+                  password: "Password@123"
+              doctor:
+                summary: Login as doctor
+                value:
+                  grant_type: password
+                  client_id: hms-client
+                  username: dr.smith
+                  password: "Password@123"
+              nurse:
+                summary: Login as nurse
+                value:
+                  grant_type: password
+                  client_id: hms-client
+                  username: nurse.silva
+                  password: "Password@123"
+              receptionist:
+                summary: Login as receptionist
+                value:
+                  grant_type: password
+                  client_id: hms-client
+                  username: reception1
+                  password: "Password@123"
+              labTech:
+                summary: Login as lab technician
+                value:
+                  grant_type: password
+                  client_id: hms-client
+                  username: labtech1
+                  password: "Password@123"
+              wardStaff:
+                summary: Login as ward staff
+                value:
+                  grant_type: password
+                  client_id: hms-client
+                  username: ward.staff1
+                  password: "Password@123"
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid credentials
+
+  # ── Health ─────────────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Gateway health check
+      description: Public endpoint — no token required. Returns gateway status.
+      security: []
+      responses:
+        '200':
+          description: Gateway is running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                success: true
+                data:
+                  status: ok
+                  service: hms-gateway
+
+  # ── Admin — RBAC Rules ─────────────────────────────────────────────────────
+
+  /admin/routes:
+    get:
+      tags: [Admin — RBAC Rules]
+      summary: List all RBAC rules
+      description: |
+        Returns the current in-memory rule list with zero-based indices.
+        Use the `index` value in PUT and DELETE calls.
+
+        Rules are matched top-to-bottom — first match wins. More specific patterns
+        must have a lower index than broader ones.
+      responses:
+        '200':
+          description: Current rule list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RouteRule'
+              example:
+                success: true
+                data:
+                  - index: 0
+                    pattern: "/patients/*/vitals-history"
+                    allowedRoles: [admin, doctor, nurse, receptionist]
+                  - index: 1
+                    pattern: "/patients/*/history"
+                    allowedRoles: [admin, doctor, nurse, receptionist]
+                  - index: 2
+                    pattern: "/patients/*/admissions"
+                    allowedRoles: [admin, ward_staff, doctor, nurse]
+                  - index: 3
+                    pattern: "/patients/**"
+                    allowedRoles: [admin, receptionist, doctor, nurse]
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Token valid but role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  message: "Admin role required to access /admin/routes"
+                  statusCode: 403
+
+    post:
+      tags: [Admin — RBAC Rules]
+      summary: Add (or replace) a rule
+      description: |
+        Adds a new rule at the requested position.
+
+        If a rule with the same `pattern` already exists it is removed first,
+        then the new rule is inserted at `position`.
+
+        Omit `position` (or set it to `-1`) to append the rule at the end of the list.
+
+        Changes take effect **immediately** — no restart required.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddRuleRequest'
+            examples:
+              addAtTop:
+                summary: Add rule at position 0 (most specific — evaluated first)
+                value:
+                  pattern: "/reports/**"
+                  allowedRoles: [admin, doctor]
+                  position: 0
+              addAtEnd:
+                summary: Add rule at end (omit position)
+                value:
+                  pattern: "/new-service/**"
+                  allowedRoles: [admin, nurse]
+      responses:
+        '200':
+          description: Rule added — returns updated rule list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RulesResponse'
+        '400':
+          description: Missing pattern or empty allowedRoles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Token valid but role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/routes/{index}:
+    put:
+      tags: [Admin — RBAC Rules]
+      summary: Update roles for an existing rule
+      description: |
+        Replaces the `allowedRoles` for the rule at the given index.
+
+        Run `GET /admin/routes` first to find the correct index.
+        To change the pattern or reorder a rule, delete it and re-add it.
+
+        Changes take effect **immediately**.
+      parameters:
+        - name: index
+          in: path
+          required: true
+          description: Zero-based index of the rule (from GET /admin/routes)
+          schema:
+            type: integer
+            minimum: 0
+          example: 3
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRuleRequest'
+            example:
+              allowedRoles: [admin, doctor, nurse]
+      responses:
+        '200':
+          description: Rule updated — returns updated rule list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RulesResponse'
+        '400':
+          description: Empty allowedRoles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Token valid but role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Index out of range
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  message: "Index 99 is out of range (size=22)"
+                  statusCode: 404
+
+    delete:
+      tags: [Admin — RBAC Rules]
+      summary: Delete a rule
+      description: |
+        Removes the rule at the given index.
+
+        Run `GET /admin/routes` first to confirm the correct index before deleting.
+        All subsequent rules shift down by one.
+
+        Changes take effect **immediately**.
+      parameters:
+        - name: index
+          in: path
+          required: true
+          description: Zero-based index of the rule to remove
+          schema:
+            type: integer
+            minimum: 0
+          example: 3
+      responses:
+        '200':
+          description: Rule deleted — returns updated rule list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RulesResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Token valid but role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Index out of range
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/routes/reset:
+    post:
+      tags: [Admin — RBAC Rules]
+      summary: Restore built-in default rules
+      description: |
+        Overwrites the current rule list with the 22 built-in default rules
+        and persists them to Redis.
+
+        Use this to undo all custom changes and return to the original configuration.
+
+        **Default rules (in order):**
+
+        | Index | Pattern | Allowed Roles |
+        |-------|---------|---------------|
+        | 0 | `/patients/*/vitals-history` | admin, doctor, nurse, receptionist |
+        | 1 | `/patients/*/history` | admin, doctor, nurse, receptionist |
+        | 2 | `/patients/*/admissions` | admin, ward_staff, doctor, nurse |
+        | 3 | `/patients/**` | admin, receptionist, doctor, nurse |
+        | 4 | `/tokens/**` | admin, receptionist |
+        | 5 | `/queue/**` | admin, receptionist, doctor, nurse |
+        | 6 | `/appointments/**` | admin, receptionist, doctor |
+        | 7 | `/sessions/**` | admin, doctor, nurse |
+        | 8 | `/pharmacy/**` | admin, doctor, nurse |
+        | 9 | `/doctors/**` | admin |
+        | 10 | `/departments/**` | admin |
+        | 11 | `/schedules/**` | admin |
+        | 12 | `/nurse-allocations/**` | admin, nurse |
+        | 13 | `/staff/**` | admin |
+        | 14 | `/invoices/**` | admin, receptionist |
+        | 15 | `/reports/**` | admin |
+        | 16 | `/prescriptions/**` | admin, receptionist |
+        | 17 | `/tests/**` | admin, lab_tech |
+        | 18 | `/orders/**` | admin, lab_tech, doctor |
+        | 19 | `/wards/**` | admin, ward_staff |
+        | 20 | `/beds/**` | admin, ward_staff |
+        | 21 | `/admissions/**` | admin, ward_staff, doctor, nurse |
+      responses:
+        '200':
+          description: Rules reset to defaults — returns the 22 default rules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RulesResponse'
+              example:
+                success: true
+                message: "Rules reset to defaults"
+                data:
+                  - index: 0
+                    pattern: "/patients/*/vitals-history"
+                    allowedRoles: [admin, doctor, nurse, receptionist]
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Token valid but role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/routes/reload:
+    post:
+      tags: [Admin — RBAC Rules]
+      summary: Reload rules from Redis
+      description: |
+        Forces the in-memory rule cache to be refreshed from Redis.
+
+        Useful when rules were modified by another gateway instance (horizontal scaling).
+        In a single-instance setup, `GET /admin/routes` is always already in sync.
+      responses:
+        '200':
+          description: Rules reloaded from Redis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RulesResponse'
+              example:
+                success: true
+                message: "Rules reloaded from Redis"
+                data: []
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Token valid but role is not admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Redis unavailable or rules key missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  message: "No rules found in Redis"
+                  statusCode: 500

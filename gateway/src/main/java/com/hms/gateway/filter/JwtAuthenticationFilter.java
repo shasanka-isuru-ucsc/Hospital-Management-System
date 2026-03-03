@@ -1,6 +1,7 @@
 package com.hms.gateway.filter;
 
 import com.hms.gateway.model.RouteRule;
+import com.hms.gateway.service.RbacRulesService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -12,9 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.stereotype.Component;
-import org.springframework.util.AntPathMatcher;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -44,37 +45,11 @@ import java.util.Set;
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private final ReactiveJwtDecoder jwtDecoder;
-    private final AntPathMatcher     pathMatcher = new AntPathMatcher();
+    private final RbacRulesService   rulesService;
 
     /** The six HMS roles we recognise — Keycloak tokens may contain additional system roles. */
     private static final Set<String> HMS_ROLES = Set.of(
             "admin", "doctor", "nurse", "receptionist", "lab_tech", "ward_staff"
-    );
-
-    // ── RBAC route rules (most specific patterns first) ───────────────────────
-    private static final List<RouteRule> ROUTE_RULES = List.of(
-        new RouteRule("/patients/*/vitals-history", "admin", "doctor", "nurse", "receptionist"),
-        new RouteRule("/patients/*/history",        "admin", "doctor", "nurse", "receptionist"),
-        new RouteRule("/patients/*/admissions",     "admin", "ward_staff", "doctor", "nurse"),
-        new RouteRule("/patients/**",               "admin", "receptionist", "doctor", "nurse"),
-        new RouteRule("/tokens/**",                 "admin", "receptionist"),
-        new RouteRule("/queue/**",                  "admin", "receptionist", "doctor", "nurse"),
-        new RouteRule("/appointments/**",           "admin", "receptionist", "doctor"),
-        new RouteRule("/sessions/**",               "admin", "doctor", "nurse"),
-        new RouteRule("/pharmacy/**",               "admin", "doctor", "nurse"),
-        new RouteRule("/doctors/**",                "admin"),
-        new RouteRule("/departments/**",            "admin"),
-        new RouteRule("/schedules/**",              "admin"),
-        new RouteRule("/nurse-allocations/**",      "admin", "nurse"),
-        new RouteRule("/staff/**",                  "admin"),
-        new RouteRule("/invoices/**",               "admin", "receptionist"),
-        new RouteRule("/reports/**",                "admin"),
-        new RouteRule("/prescriptions/**",          "admin", "receptionist"),
-        new RouteRule("/tests/**",                  "admin", "lab_tech"),
-        new RouteRule("/orders/**",                 "admin", "lab_tech", "doctor"),
-        new RouteRule("/wards/**",                  "admin", "ward_staff"),
-        new RouteRule("/beds/**",                   "admin", "ward_staff"),
-        new RouteRule("/admissions/**",             "admin", "ward_staff", "doctor", "nurse")
     );
 
     @Override
@@ -92,7 +67,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         }
 
         // Find matching RBAC rule (404 if no route exists for this path)
-        RouteRule rule = findRule(path);
+        RouteRule rule = rulesService.findMatchingRule(path);
         if (rule == null) {
             return writeError(exchange, HttpStatus.NOT_FOUND,
                     "Cannot " + exchange.getRequest().getMethod() + " " + path);
@@ -144,8 +119,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
                     return chain.filter(exchange.mutate().request(mutated).build());
                 })
-                .onErrorResume(e -> {
-                    // Catches JwtValidationException, BadJwtException, and any other JWT error
+                .onErrorResume(BadJwtException.class, e -> {
+                    // Catches JwtValidationException (extends BadJwtException) and BadJwtException
+                    // Does NOT catch downstream connectivity errors (ConnectException, etc.)
                     log.debug("[JWT] Validation failed for {}: {}", path, e.getMessage());
                     String msg = e.getMessage() != null && e.getMessage().contains("expired")
                             ? "Token has expired" : "Invalid or unrecognised token";
@@ -165,13 +141,6 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         if (!(rolesObj instanceof List)) return null;
         return ((List<String>) rolesObj).stream()
                 .filter(HMS_ROLES::contains)
-                .findFirst()
-                .orElse(null);
-    }
-
-    private RouteRule findRule(String path) {
-        return ROUTE_RULES.stream()
-                .filter(r -> pathMatcher.match(r.pattern(), path))
                 .findFirst()
                 .orElse(null);
     }

@@ -1,0 +1,906 @@
+### HMS — Gateway API Collection
+### All requests go through the gateway (port 3000).
+### The gateway validates the JWT, enforces RBAC, and injects X-User-* headers.
+### Run setup-keycloak.sh before using this file.
+
+@gatewayUrl  = http://localhost:3000
+@keycloakUrl = http://localhost:8080
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 0. LOGIN — get tokens for each role
+#    Keycloak endpoint (call directly, NOT through gateway)
+#    Seed accounts created by scripts/setup-keycloak.sh  password: Password@123
+# ══════════════════════════════════════════════════════════════════════════════
+
+### 0a. Login as admin
+# @name loginAdmin
+POST {{keycloakUrl}}/realms/hms/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=hms-client&username=admin&password=Password%40123
+
+###
+@adminToken = {{loginAdmin.response.body.access_token}}
+
+### 0b. Login as doctor (dr.smith)
+# @name loginDoctor
+POST {{keycloakUrl}}/realms/hms/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=hms-client&username=dr.smith&password=Password%40123
+
+###
+@doctorToken = {{loginDoctor.response.body.access_token}}
+
+### 0c. Login as nurse (nurse.silva)
+# @name loginNurse
+POST {{keycloakUrl}}/realms/hms/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=hms-client&username=nurse.silva&password=Password%40123
+
+###
+@nurseToken = {{loginNurse.response.body.access_token}}
+
+### 0d. Login as receptionist
+# @name loginReceptionist
+POST {{keycloakUrl}}/realms/hms/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=hms-client&username=reception1&password=Password%40123
+
+###
+@receptionistToken = {{loginReceptionist.response.body.access_token}}
+
+### 0e. Login as lab technician
+# @name loginLabTech
+POST {{keycloakUrl}}/realms/hms/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=hms-client&username=labtech1&password=Password%40123
+
+###
+@labTechToken = {{loginLabTech.response.body.access_token}}
+
+### 0f. Login as ward staff
+# @name loginWardStaff
+POST {{keycloakUrl}}/realms/hms/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password&client_id=hms-client&username=ward.staff1&password=Password%40123
+
+###
+@wardStaffToken = {{loginWardStaff.response.body.access_token}}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GATEWAY HEALTH & AUTH TESTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+### Health check — no token required
+GET {{gatewayUrl}}/health
+
+###
+
+### Expect 401 — no token on protected route
+GET {{gatewayUrl}}/patients/00000000-0000-0000-0000-000000000001
+
+###
+
+### Expect 403 — lab_tech cannot access /patients
+GET {{gatewayUrl}}/patients/00000000-0000-0000-0000-000000000001
+Authorization: Bearer {{labTechToken}}
+
+###
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ADMIN — RBAC ROUTE RULES  (admin JWT required for all)
+# Manage route-to-role access at runtime — no restart needed.
+# Rules are matched top-to-bottom; first match wins.
+# GET /admin/routes first to find the index before using PUT or DELETE.
+# ══════════════════════════════════════════════════════════════════════════════
+
+### A1. List all rules (with indices)
+GET {{gatewayUrl}}/admin/routes
+Authorization: Bearer {{adminToken}}
+
+###
+
+### A2. Add a new rule at position 0 (most specific first)
+POST {{gatewayUrl}}/admin/routes
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "pattern": "/reports/**",
+  "allowedRoles": ["admin", "doctor"],
+  "position": 0
+}
+
+###
+
+### A3. Add a rule at the end (omit position or use -1)
+POST {{gatewayUrl}}/admin/routes
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "pattern": "/new-service/**",
+  "allowedRoles": ["admin", "nurse", "doctor"]
+}
+
+###
+
+### A4. Update roles for rule at index 0
+#     Run A1 first to confirm the index of the rule you want to change
+PUT {{gatewayUrl}}/admin/routes/0
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "allowedRoles": ["admin", "doctor", "nurse", "receptionist"]
+}
+
+###
+
+### A5. Delete rule at index 0
+#     Run A1 first to confirm the index
+DELETE {{gatewayUrl}}/admin/routes/0
+Authorization: Bearer {{adminToken}}
+
+###
+
+### A6. Restore all 22 built-in default rules (overwrites any custom changes)
+POST {{gatewayUrl}}/admin/routes/reset
+Authorization: Bearer {{adminToken}}
+
+###
+
+### A7. Reload rules from Redis into memory
+#     Use this if rules were modified by another gateway instance
+POST {{gatewayUrl}}/admin/routes/reload
+Authorization: Bearer {{adminToken}}
+
+###
+
+### A8. Expect 401 — no token on admin route
+GET {{gatewayUrl}}/admin/routes
+
+###
+
+### A9. Expect 403 — doctor cannot access admin routes
+GET {{gatewayUrl}}/admin/routes
+Authorization: Bearer {{doctorToken}}
+
+###
+
+###
+
+# ══════════════════════════════════════════════════════════════════════════════
+# RECEPTION SERVICE  (port 3001 via gateway)
+# Roles allowed: admin, receptionist, doctor, nurse (patients/queue/appointments)
+#                admin, receptionist (tokens)
+# ══════════════════════════════════════════════════════════════════════════════
+
+### R1. Register a new patient
+# @name registerPatient
+POST {{gatewayUrl}}/patients
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "firstName": "Amanda",
+  "lastName": "Silva",
+  "mobile": "+94711234567",
+  "dateOfBirth": "1992-05-15",
+  "gender": "female"
+}
+
+###
+@patientId = {{registerPatient.response.body.data.id}}
+
+### R2. Get patient by ID
+GET {{gatewayUrl}}/patients/{{patientId}}
+Authorization: Bearer {{adminToken}}
+
+###
+
+### R3. Search patients
+GET {{gatewayUrl}}/patients/search?q=Amanda
+Authorization: Bearer {{adminToken}}
+
+###
+
+### R4. Update patient
+PUT {{gatewayUrl}}/patients/{{patientId}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "firstName": "Amanda",
+  "lastName": "Perera",
+  "mobile": "+94711234567",
+  "dateOfBirth": "1992-05-15",
+  "gender": "female"
+}
+
+###
+
+### R5. Issue OPD token
+# @name issueToken
+POST {{gatewayUrl}}/tokens
+Authorization: Bearer {{receptionistToken}}
+Content-Type: application/json
+
+{
+  "patientId": "{{patientId}}",
+  "queueType": "opd"
+}
+
+###
+@tokenId = {{issueToken.response.body.data.id}}
+
+### R6. Get today's tokens
+GET {{gatewayUrl}}/tokens/today
+Authorization: Bearer {{receptionistToken}}
+
+###
+
+### R7. Get live OPD queue
+GET {{gatewayUrl}}/queue/opd
+Authorization: Bearer {{adminToken}}
+
+###
+
+### R8. Call token (update status)
+PUT {{gatewayUrl}}/tokens/{{tokenId}}/status
+Authorization: Bearer {{receptionistToken}}
+Content-Type: application/json
+
+{
+  "status": "called"
+}
+
+###
+
+### R9. Book appointment
+# @name bookAppointment
+# Replace doctorId with a real UUID from staff-service after creating a doctor
+POST {{gatewayUrl}}/appointments
+Authorization: Bearer {{receptionistToken}}
+Content-Type: application/json
+
+{
+  "patientId": "{{patientId}}",
+  "doctorId": "00000000-0000-0000-0000-000000000001",
+  "appointmentDate": "2026-04-01",
+  "fromTime": "09:00",
+  "toTime": "09:15"
+}
+
+###
+@appointmentId = {{bookAppointment.response.body.data.id}}
+
+### R10. List appointments for a date
+GET {{gatewayUrl}}/appointments?date=2026-04-01
+Authorization: Bearer {{receptionistToken}}
+
+###
+
+### R11. Cancel appointment
+DELETE {{gatewayUrl}}/appointments/{{appointmentId}}
+Authorization: Bearer {{receptionistToken}}
+
+###
+
+# ══════════════════════════════════════════════════════════════════════════════
+# STAFF SERVICE  (port 3003 via gateway)
+# Roles allowed: admin only for all /doctors, /departments, /schedules, /staff
+#                admin + nurse for /nurse-allocations
+# ══════════════════════════════════════════════════════════════════════════════
+
+### S1. List departments
+GET {{gatewayUrl}}/departments
+Authorization: Bearer {{adminToken}}
+
+###
+
+### S2. Create department
+# @name createDept
+POST {{gatewayUrl}}/departments
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "General Physician",
+  "description": "Primary care and general medicine"
+}
+
+###
+@deptId = {{createDept.response.body.data.id}}
+
+### S3. Create doctor (multipart — use curl for file upload, JSON-only example here)
+# curl -X POST http://localhost:3000/doctors \
+#   -H "Authorization: Bearer <adminToken>" \
+#   -F "first_name=Jenny" -F "last_name=Smith" \
+#   -F "username=dr.jennysmith" -F "email=jenny.smith@hospital.com" \
+#   -F "mobile=+94771234567" -F "password=Password@123" \
+#   -F "date_of_birth=1985-05-20" -F "gender=female" \
+#   -F "education=MBBS, MS" -F "designation=Senior Physician" \
+#   -F "department_id=DEPT_ID_HERE"
+
+###
+
+### S4. List all doctors
+GET {{gatewayUrl}}/doctors
+Authorization: Bearer {{adminToken}}
+
+###
+
+### S5. List doctors by department
+GET {{gatewayUrl}}/doctors?department_id={{deptId}}&status=active
+Authorization: Bearer {{adminToken}}
+
+###
+
+### S6. Create staff member (nurse)
+# @name createNurse
+POST {{gatewayUrl}}/staff
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "full_name": "Sarah Williams",
+  "role": "nurse",
+  "email": "sarah.williams@hospital.com",
+  "mobile": "+94779876543"
+}
+
+###
+@nurseStaffId = {{createNurse.response.body.data.id}}
+
+### S7. List available nurses for a date
+GET {{gatewayUrl}}/staff/available?date=2026-04-10&role=nurse
+Authorization: Bearer {{adminToken}}
+
+###
+
+### S8. List all staff
+GET {{gatewayUrl}}/staff
+Authorization: Bearer {{adminToken}}
+
+###
+
+# Replace with real doctor UUID and nurse UUID after creating them
+### S9. Allocate nurse to doctor session
+# @name allocateNurse
+POST {{gatewayUrl}}/nurse-allocations
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "nurse_id": "{{nurseStaffId}}",
+  "doctor_id": "00000000-0000-0000-0000-000000000001",
+  "session_date": "2026-04-10"
+}
+
+###
+@allocationId = {{allocateNurse.response.body.data.id}}
+
+### S10. Complete allocation
+PUT {{gatewayUrl}}/nurse-allocations/{{allocationId}}/complete
+Authorization: Bearer {{adminToken}}
+
+###
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CLINICAL SERVICE  (port 3002 via gateway)
+# Roles: admin, doctor, nurse
+# Gateway injects X-User-Id (Keycloak UUID) and X-User-Name from the JWT
+# ══════════════════════════════════════════════════════════════════════════════
+
+### C1. Create clinical session
+# @name createSession
+POST {{gatewayUrl}}/sessions
+Authorization: Bearer {{doctorToken}}
+Content-Type: application/json
+
+{
+  "patientId": "{{patientId}}",
+  "sessionType": "opd",
+  "chiefComplaint": "Persistent fever for 3 days"
+}
+
+###
+@sessionId = {{createSession.response.body.data.id}}
+
+### C2. List sessions
+GET {{gatewayUrl}}/sessions?page=1&limit=20
+Authorization: Bearer {{doctorToken}}
+
+###
+
+### C3. Get session by ID
+GET {{gatewayUrl}}/sessions/{{sessionId}}
+Authorization: Bearer {{doctorToken}}
+
+###
+
+### C4. Record vitals
+POST {{gatewayUrl}}/sessions/{{sessionId}}/vitals
+Authorization: Bearer {{doctorToken}}
+Content-Type: application/json
+
+{
+  "bpm": 88,
+  "temperature": 38.2,
+  "bloodPressureSys": 118,
+  "bloodPressureDia": 76,
+  "spo2": 97,
+  "weightKg": 65.0,
+  "heightCm": 168
+}
+
+###
+
+### C5. Add prescriptions
+# @name addPrescriptions
+POST {{gatewayUrl}}/sessions/{{sessionId}}/prescriptions
+Authorization: Bearer {{doctorToken}}
+Content-Type: application/json
+
+{
+  "prescriptions": [
+    {
+      "type": "internal",
+      "medicineName": "Paracetamol",
+      "dosage": "500mg",
+      "frequency": "Every 8 hours",
+      "durationDays": 5,
+      "instructions": "Take after meals"
+    },
+    {
+      "type": "external",
+      "medicineName": "Amoxicillin",
+      "dosage": "500mg",
+      "frequency": "Three times daily",
+      "durationDays": 7,
+      "pharmacyName": "City Pharmacy"
+    }
+  ]
+}
+
+###
+
+### C6. Request lab tests
+# Replace testId values with real UUIDs from lab-service after creating tests
+POST {{gatewayUrl}}/sessions/{{sessionId}}/lab-requests
+Authorization: Bearer {{doctorToken}}
+Content-Type: application/json
+
+{
+  "tests": [
+    { "testId": "00000000-0000-0000-0000-000000000001", "urgency": "routine" }
+  ],
+  "notes": "Suspected typhoid — check Widal"
+}
+
+###
+
+### C7. Complete session (triggers billing.opd + pharmacy.new_rx NATS events)
+PUT {{gatewayUrl}}/sessions/{{sessionId}}/complete
+Authorization: Bearer {{doctorToken}}
+Content-Type: application/json
+
+{
+  "diagnosis": "Typhoid Fever — Widal test positive",
+  "discountPercent": 0
+}
+
+###
+
+### C8. Get patient clinical history
+GET {{gatewayUrl}}/patients/{{patientId}}/history?page=1&limit=10
+Authorization: Bearer {{doctorToken}}
+
+###
+
+### C9. Get pharmacy queue (completed sessions with pending internal prescriptions)
+GET {{gatewayUrl}}/pharmacy/queue
+Authorization: Bearer {{adminToken}}
+
+###
+
+### C10. Dispense prescription — replace rxId with a real UUID from C9
+@rxId = 00000000-0000-0000-0000-000000000001
+PUT {{gatewayUrl}}/pharmacy/{{rxId}}/dispense
+Authorization: Bearer {{adminToken}}
+
+###
+
+# ══════════════════════════════════════════════════════════════════════════════
+# LAB SERVICE  (port 3005 via gateway)
+# Roles: admin, lab_tech (tests + orders)
+#        admin, lab_tech, doctor (orders)
+# ══════════════════════════════════════════════════════════════════════════════
+
+### L1. Add test to catalog — Complete Blood Count
+# @name addTestCBC
+POST {{gatewayUrl}}/tests
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Complete Blood Count",
+  "code": "CBC",
+  "category": "Haematology",
+  "unitPrice": 750.00,
+  "turnaroundHours": 4,
+  "referenceRange": "WBC: 4.5-11.0 x10³/μL, RBC: 4.5-5.5 x10⁶/μL"
+}
+
+###
+@cbcTestId = {{addTestCBC.response.body.data.id}}
+
+### L2. Add test — Widal
+# @name addTestWidal
+POST {{gatewayUrl}}/tests
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Widal Test",
+  "code": "WIDAL",
+  "category": "Microbiology",
+  "unitPrice": 500.00,
+  "turnaroundHours": 24,
+  "referenceRange": "Negative < 1:80 titre"
+}
+
+###
+@widalTestId = {{addTestWidal.response.body.data.id}}
+
+### L3. Get test catalog
+GET {{gatewayUrl}}/tests
+Authorization: Bearer {{labTechToken}}
+
+###
+
+### L4. Register walk-in lab order
+# @name createOrder
+POST {{gatewayUrl}}/orders
+Authorization: Bearer {{labTechToken}}
+Content-Type: application/json
+
+{
+  "patientName": "Andrea Lalema",
+  "patientMobile": "+94771234567",
+  "source": "walk_in",
+  "tests": [
+    { "testId": "{{cbcTestId}}", "urgency": "routine" },
+    { "testId": "{{widalTestId}}", "urgency": "urgent" }
+  ],
+  "notes": "Patient reports fever for 4 days"
+}
+
+###
+@orderId = {{createOrder.response.body.data.id}}
+@orderTestId1 = {{createOrder.response.body.data.tests[0].id}}
+@orderTestId2 = {{createOrder.response.body.data.tests[1].id}}
+
+### L5. List orders
+GET {{gatewayUrl}}/orders
+Authorization: Bearer {{labTechToken}}
+
+###
+
+### L6. Get order by ID
+GET {{gatewayUrl}}/orders/{{orderId}}
+Authorization: Bearer {{labTechToken}}
+
+###
+
+### L7. Enter results — first test (status → processing)
+PUT {{gatewayUrl}}/orders/{{orderId}}/results
+Authorization: Bearer {{labTechToken}}
+Content-Type: application/json
+
+{
+  "results": [
+    {
+      "orderTestId": "{{orderTestId1}}",
+      "resultValue": "WBC: 9.2 x10³/μL — all values normal",
+      "isAbnormal": false,
+      "technicianNotes": "Within normal range"
+    }
+  ]
+}
+
+###
+
+### L8. Enter results — second test (status → completed)
+PUT {{gatewayUrl}}/orders/{{orderId}}/results
+Authorization: Bearer {{labTechToken}}
+Content-Type: application/json
+
+{
+  "results": [
+    {
+      "orderTestId": "{{orderTestId2}}",
+      "resultValue": "S.Typhi O: 1:160 — significant titre",
+      "isAbnormal": true,
+      "technicianNotes": "Recommend clinical correlation"
+    }
+  ]
+}
+
+###
+
+### L9. Record payment (triggers billing.lab NATS event to finance)
+PUT {{gatewayUrl}}/orders/{{orderId}}/pay
+Authorization: Bearer {{labTechToken}}
+Content-Type: application/json
+
+{
+  "paymentMethod": "cash",
+  "amountPaid": 1250.00
+}
+
+###
+
+### L10. Upload report PDF — use curl for multipart:
+# curl -X POST http://localhost:3000/orders/ORDER_ID/report \
+#   -H "Authorization: Bearer LAB_TOKEN" \
+#   -F "report=@/path/to/report.pdf;type=application/pdf" \
+#   -F "notes=Typhoid confirmed"
+
+###
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WARD SERVICE  (port 3006 via gateway)
+# Roles: admin, ward_staff (wards/beds/admissions)
+#        admin, ward_staff, doctor, nurse (admissions)
+# ══════════════════════════════════════════════════════════════════════════════
+
+### W1. Create Male General Ward (auto-generates beds)
+# @name createWard
+POST {{gatewayUrl}}/wards
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Male General Ward",
+  "type": "general",
+  "capacity": 20
+}
+
+###
+@wardId = {{createWard.response.body.data.id}}
+
+### W2. Create ICU
+POST {{gatewayUrl}}/wards
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "ICU",
+  "type": "icu",
+  "capacity": 6
+}
+
+###
+
+### W3. List all wards (with occupancy)
+GET {{gatewayUrl}}/wards
+Authorization: Bearer {{wardStaffToken}}
+
+###
+
+### W4. List available beds in ward
+# @name listAvailableBeds
+GET {{gatewayUrl}}/beds?ward_id={{wardId}}&status=available
+Authorization: Bearer {{wardStaffToken}}
+
+###
+
+### W5. Admit patient
+# @name admitPatient
+# Update bedId from W4 response
+POST {{gatewayUrl}}/admissions
+Authorization: Bearer {{wardStaffToken}}
+Content-Type: application/json
+
+{
+  "patientId": "{{patientId}}",
+  "patientName": "Amanda Perera",
+  "patientNumber": "R00001",
+  "bedId": "00000000-0000-0000-0000-000000000001",
+  "attendingDoctorId": "00000000-0000-0000-0000-000000000001",
+  "attendingDoctorName": "Dr. Jenny Smith",
+  "admissionReason": "High fever — IV treatment required",
+  "notes": "No known allergies"
+}
+
+###
+@admissionId = {{admitPatient.response.body.data.id}}
+
+### W6. List current admissions
+GET {{gatewayUrl}}/admissions?status=admitted
+Authorization: Bearer {{adminToken}}
+
+###
+
+### W7. Add bed charge
+POST {{gatewayUrl}}/admissions/{{admissionId}}/services
+Authorization: Bearer {{wardStaffToken}}
+Content-Type: application/json
+
+{
+  "serviceName": "Daily Bed Charge",
+  "serviceType": "bed_charge",
+  "quantity": 1,
+  "unitPrice": 2500.00,
+  "notes": "Day 1"
+}
+
+###
+
+### W8. Add medication charge
+POST {{gatewayUrl}}/admissions/{{admissionId}}/services
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "serviceName": "IV Ceftriaxone 1g",
+  "serviceType": "medication",
+  "quantity": 2,
+  "unitPrice": 450.00
+}
+
+###
+
+### W9. Get admission with running total
+GET {{gatewayUrl}}/admissions/{{admissionId}}
+Authorization: Bearer {{adminToken}}
+
+###
+
+### W10. Discharge patient (triggers billing.ward NATS event to finance)
+PUT {{gatewayUrl}}/admissions/{{admissionId}}/discharge
+Authorization: Bearer {{wardStaffToken}}
+Content-Type: application/json
+
+{
+  "dischargeNotes": "Patient recovered. Discharged with oral antibiotics.",
+  "dischargeDiagnosis": "Typhoid Fever — resolved"
+}
+
+###
+
+### W11. Patient admission history
+GET {{gatewayUrl}}/patients/{{patientId}}/admissions
+Authorization: Bearer {{adminToken}}
+
+###
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FINANCE SERVICE  (port 3004 via gateway)
+# Roles: admin, receptionist (invoices + prescriptions)
+#        admin (reports)
+# ══════════════════════════════════════════════════════════════════════════════
+
+### F1. Create invoice manually (OPD walk-in)
+# @name createInvoice
+POST {{gatewayUrl}}/invoices
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "patientId": "{{patientId}}",
+  "patientName": "Amanda Perera",
+  "billingModule": "opd",
+  "lineItems": [
+    {
+      "itemName": "Doctor Consultation",
+      "itemType": "consultation",
+      "quantity": 1,
+      "unitPrice": 1500.00
+    },
+    {
+      "itemName": "ECG",
+      "itemType": "procedure",
+      "quantity": 1,
+      "unitPrice": 500.00
+    }
+  ],
+  "notes": "Walk-in OPD"
+}
+
+###
+@invoiceId = {{createInvoice.response.body.data.id}}
+
+### F2. List all invoices
+GET {{gatewayUrl}}/invoices?page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+###
+
+### F3. List pending invoices
+GET {{gatewayUrl}}/invoices?payment_status=pending&page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+###
+
+### F4. Get invoice by ID
+GET {{gatewayUrl}}/invoices/{{invoiceId}}
+Authorization: Bearer {{adminToken}}
+
+###
+
+### F5. Apply 10% discount
+POST {{gatewayUrl}}/invoices/{{invoiceId}}/discount
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "discountType": "percentage",
+  "discountValue": 10,
+  "reason": "Staff family member"
+}
+
+###
+
+### F6. Record payment (marks invoice paid)
+PUT {{gatewayUrl}}/invoices/{{invoiceId}}/pay
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "paymentMethod": "cash",
+  "amountPaid": 1800.00,
+  "notes": "Received at billing counter"
+}
+
+###
+
+### F7. Print-formatted invoice
+GET {{gatewayUrl}}/invoices/{{invoiceId}}/print
+Authorization: Bearer {{adminToken}}
+
+###
+
+### F8. Generate prescription PDF (external pharmacy)
+POST {{gatewayUrl}}/prescriptions/print
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "sessionId": "{{sessionId}}",
+  "doctorName": "Dr. Jenny Smith",
+  "hospitalName": "City General Hospital"
+}
+
+###
+
+### F9. Revenue summary — this month
+GET {{gatewayUrl}}/reports/summary
+Authorization: Bearer {{adminToken}}
+
+###
+
+### F10. Revenue summary — today
+GET {{gatewayUrl}}/reports/summary?period=today
+Authorization: Bearer {{adminToken}}
+
+###
+
+### F11. Earnings chart — this year
+GET {{gatewayUrl}}/reports/earnings
+Authorization: Bearer {{adminToken}}
+
+###
+
+### F12. Department statistics
+GET {{gatewayUrl}}/reports/departments?period=this_month
+Authorization: Bearer {{adminToken}}
+
+###

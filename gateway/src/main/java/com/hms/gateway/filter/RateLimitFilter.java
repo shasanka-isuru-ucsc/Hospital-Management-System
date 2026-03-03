@@ -44,28 +44,33 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
         String ip  = resolveClientIp(exchange);
         String key = "rl:" + ip;
 
-        return redisTemplate.opsForValue()
+        // Fail open: if Redis is down, treat count as 0 (allow through)
+        Mono<Long> countMono = redisTemplate.opsForValue()
                 .increment(key)
                 .flatMap(count -> {
                     // On the very first request in this window, set the expiry
                     if (count == 1) {
-                        return redisTemplate.expire(key, WINDOW).thenReturn(count);
+                        return redisTemplate.expire(key, WINDOW)
+                                .onErrorResume(e -> Mono.just(false))
+                                .thenReturn(count);
                     }
                     return Mono.just(count);
                 })
-                .flatMap(count -> {
-                    if (count > MAX_REQUESTS) {
-                        log.warn("[RateLimit] IP {} exceeded limit ({} req/min)", ip, MAX_REQUESTS);
-                        return writeError(exchange, HttpStatus.TOO_MANY_REQUESTS,
-                                "Too many requests — limit is " + MAX_REQUESTS + " per minute");
-                    }
-                    return chain.filter(exchange);
-                })
-                // Fail open: if Redis is down we still let the request through
                 .onErrorResume(err -> {
-                    log.error("[RateLimit] Redis error — failing open: {}", err.getMessage());
-                    return chain.filter(exchange);
+                    // Only Redis connectivity errors reach here (increment failed)
+                    log.error("[RateLimit] Redis unavailable — failing open: {}", err.getMessage());
+                    return Mono.just(0L);
                 });
+
+        return countMono.flatMap(count -> {
+            if (count > MAX_REQUESTS) {
+                log.warn("[RateLimit] IP {} exceeded limit ({} req/min)", ip, MAX_REQUESTS);
+                return writeError(exchange, HttpStatus.TOO_MANY_REQUESTS,
+                        "Too many requests — limit is " + MAX_REQUESTS + " per minute");
+            }
+            // chain.filter errors (downstream 502/503) propagate normally — not caught here
+            return chain.filter(exchange);
+        });
     }
 
     private String resolveClientIp(ServerWebExchange exchange) {
