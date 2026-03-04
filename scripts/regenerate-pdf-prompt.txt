@@ -1,0 +1,573 @@
+================================================================================
+PROMPT: Regenerate HMS API Specification PDF (v2.0)
+================================================================================
+
+You are a technical writer regenerating a Hospital Management System (HMS) API
+Specification document. I am attaching:
+  1. The CURRENT PDF (HMS_API_Specification.pdf — v1.1, outdated)
+  2. Seven OpenAPI YAML files, one per service/gateway:
+       00_gateway.yaml        — API Gateway (Spring Cloud Gateway, port 3000)
+       01_reception_service.yaml   — Reception Service (port 3001)
+       02_clinical_service.yaml    — Clinical Service (port 3002)
+       03_staff_service.yaml       — Staff Service (port 3003)
+       04_finance_service.yaml     — Finance Service (port 3004)
+       05_lab_service.yaml         — Lab Service (port 3005)
+       06_ward_service.yaml        — Ward Service (port 3006)
+
+Your job: produce a complete, accurate, well-structured PDF document (v2.0) that
+replaces the old one. Use the YAML files as the authoritative source of truth for
+all endpoints and schemas. The PDF should follow the same look-and-feel as the
+existing document (cover page, sections, tables, code blocks) but updated for
+the current project state.
+
+Below I describe every change, correction, addition, and deletion needed.
+
+────────────────────────────────────────────────────────────────────────────────
+PART 1 — METADATA / COVER PAGE
+────────────────────────────────────────────────────────────────────────────────
+
+Update the cover page:
+  - Version: v2.0
+  - Date: March 2026
+  - Keep: "Narammala Channeling Hospital", "HMS API Specification", MSc Project
+  - Update the technology list to:
+      8 Components: 6 Spring Boot Microservices + API Gateway + WebSocket Bridge
+      Java 21 + Spring Boot 3  |  PostgreSQL 15  |  Keycloak 23 (auth)
+      MinIO (file storage)  |  NATS JetStream (messaging)
+      Redis 7 (rate limiting)  |  Node.js 22 (WebSocket bridge)
+
+────────────────────────────────────────────────────────────────────────────────
+PART 2 — ARCHITECTURE DIAGRAM (replace entirely)
+────────────────────────────────────────────────────────────────────────────────
+
+The existing diagram is incorrect. Draw a new ASCII/box diagram with these
+components and connections:
+
+CLIENTS (Browser / Mobile / Postman)
+  │  REST (JWT in Authorization header)
+  ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  API GATEWAY  :3000  (Spring Cloud Gateway)                                 │
+│    RateLimitFilter → JwtAuthenticationFilter → Route Proxy                  │
+│    JWT validated via Keycloak JWKS (RS256, no shared secret)                │
+│    Injects headers: X-User-Id, X-User-Role, X-User-Name                    │
+│    RBAC rules stored in Redis (hot-reloadable via /admin/routes)            │
+└──────────┬────────────────────────────────────────────────────────┬─────────┘
+           │ REST proxy                                              │ Redis :6379
+           ▼                                                         ▼
+┌──────────────────────────────────────────────────────────┐  ┌─────────────┐
+│  MICROSERVICES                                            │  │  Redis 7    │
+│  Reception  :3001   Clinical   :3002                     │  │  Rate limit │
+│  Staff      :3003   Finance    :3004                     │  │  RBAC rules │
+│  Lab        :3005   Ward       :3006                     │  └─────────────┘
+└────────────┬──────────────────────────────────────┬──────┘
+             │ JDBC                                  │ NATS publish/subscribe
+             ▼                                       ▼
+    ┌─────────────────┐              ┌────────────────────────────────────┐
+    │  PostgreSQL 15  │              │  NATS JetStream :4222              │
+    │  :5432          │              │  Streams: BILLING, LAB,            │
+    │  hms_db         │              │           QUEUE, PHARMACY          │
+    └─────────────────┘              └───────────────────┬────────────────┘
+                                                         │ subscribe
+                                                         ▼
+                                          ┌──────────────────────────────┐
+                                          │  WebSocket Bridge  :3010     │
+                                          │  (Node.js + Socket.IO)       │
+                                          │  Rooms: queue, pharmacy      │
+                                          └──────────────┬───────────────┘
+                                                         │ Socket.IO push
+                                                         ▼
+                                                  Browser clients
+
+Also show MinIO separately:
+    ┌──────────────────────────────────────────────────────┐
+    │  MinIO  :9000 / :9001                                │
+    │  Buckets: hms-avatars, hms-doctor-banners,           │
+    │           hms-prescriptions, hms-lab-reports,        │
+    │           hms-scans                                  │
+    └──────────────────────────────────────────────────────┘
+    (Staff, Finance, Lab, Reception services upload/read from MinIO)
+
+Also show Keycloak:
+    ┌──────────────────────────────────────────────────────┐
+    │  Keycloak 23  :8080                                  │
+    │  Realm: hms                                          │
+    │  Client: hms-client (public, Direct Access Grants)   │
+    │  Roles: admin, doctor, nurse, receptionist,          │
+    │         lab_tech, ward_staff                         │
+    │  JWKS endpoint: /realms/hms/protocol/openid-connect/ │
+    │                 certs  (used by API Gateway)         │
+    └──────────────────────────────────────────────────────┘
+
+Key relationships to show:
+  - Clients authenticate DIRECTLY against Keycloak (NOT through the gateway)
+  - Gateway validates JWTs via Keycloak JWKS (not a shared secret)
+  - ws-bridge is a SEPARATE Node.js process, NOT embedded in the gateway
+  - All 6 services share the same PostgreSQL 15 instance (different schemas)
+  - Redis is used by the gateway only (rate limiting + RBAC rule storage)
+
+────────────────────────────────────────────────────────────────────────────────
+PART 3 — GLOBAL CONVENTIONS (update existing section)
+────────────────────────────────────────────────────────────────────────────────
+
+3.1 Service Port Table — replace with:
+
+  Component            | Port  | Technology
+  ---------------------|-------|----------------------------------
+  API Gateway          | 3000  | Spring Cloud Gateway (Java 21)
+  Reception Service    | 3001  | Spring Boot 3 (Java 21)
+  Clinical Service     | 3002  | Spring Boot 3 (Java 21)
+  Staff Service        | 3003  | Spring Boot 3 (Java 21)
+  Finance Service      | 3004  | Spring Boot 3 (Java 21)
+  Lab Service          | 3005  | Spring Boot 3 (Java 21)
+  Ward Service         | 3006  | Spring Boot 3 (Java 21)
+  WebSocket Bridge     | 3010  | Node.js 22 + Socket.IO
+  Keycloak (Auth)      | 8080  | Keycloak 23
+  PostgreSQL           | 5432  | PostgreSQL 15
+  NATS JetStream       | 4222  | NATS 2.10
+  MinIO (S3 API)       | 9000  | MinIO
+  MinIO (Console)      | 9001  | MinIO
+  Redis                | 6379  | Redis 7
+
+3.2 Authentication Flow — REPLACE entirely (the existing text is wrong):
+
+  Authentication is handled entirely by Keycloak. There is NO custom auth-service.
+
+  Step 1: Client obtains a JWT from Keycloak directly (NOT through the gateway):
+
+    POST http://localhost:8080/realms/hms/protocol/openid-connect/token
+    Content-Type: application/x-www-form-urlencoded
+
+    grant_type=password
+    client_id=hms-client        ← public client, NO client_secret needed
+    username=admin
+    password=Password@123
+
+  Step 2: Client includes the token in every API call:
+
+    Authorization: Bearer <access_token>
+
+  The gateway validates the JWT signature using Keycloak's JWKS endpoint
+  (RS256 asymmetric — no shared secret). It then injects three headers that
+  downstream services read instead of parsing the JWT themselves:
+
+    X-User-Id    — Keycloak user UUID (jwt.sub)
+    X-User-Role  — one of: admin, doctor, nurse, receptionist, lab_tech, ward_staff
+    X-User-Name  — full name from JWT (name claim → preferred_username fallback)
+
+  Token lifetime: 5 minutes (300 seconds). Use the refresh_token to renew.
+
+  Seed accounts (password: Password@123):
+    admin        → role: admin
+    dr.smith     → role: doctor
+    nurse.silva  → role: nurse
+    reception1   → role: receptionist
+    labtech1     → role: lab_tech
+    ward.staff1  → role: ward_staff
+
+3.3 Standard Response Envelope — keep the existing format, it is correct:
+    { "success": true/false, "data": ..., "meta": {...}, "error": {...} }
+
+3.4 HTTP Status Codes — keep the existing table, it is correct.
+
+3.5 File Upload / MinIO — keep the existing content but update bucket list:
+    hms-avatars         — doctor/staff profile avatars (Staff Service)
+    hms-doctor-banners  — doctor banner images (Staff Service)
+    hms-prescriptions   — prescription PDFs (Finance Service)
+    hms-lab-reports     — lab report PDFs (Lab Service)
+    hms-scans           — clinical scan images (Reception/Clinical Services)
+
+3.6 Pagination — keep the existing content, it is correct.
+
+────────────────────────────────────────────────────────────────────────────────
+PART 4 — NATS JETSREAM MESSAGING (replace existing section entirely)
+────────────────────────────────────────────────────────────────────────────────
+
+Replace the entire NATS section. The old section incorrectly shows a single
+HMS_EVENTS stream. The actual configuration uses FOUR streams:
+
+  Stream   | Subjects        | Retention  | Consumers (durables)
+  ---------|-----------------|------------|------------------------------
+  BILLING  | billing.>       | WorkQueue  | finance-billing-opd
+           |                 |            | finance-billing-wound
+           |                 |            | finance-billing-ward
+           |                 |            | finance-billing-lab
+  LAB      | lab.>           | WorkQueue  | lab-requested
+  QUEUE    | queue.>         | WorkQueue  | ws-bridge-queue
+  PHARMACY | pharmacy.>      | WorkQueue  | ws-bridge-pharmacy
+
+  WorkQueue retention = message is deleted after the consumer acknowledges it.
+
+Event Subjects Reference:
+
+  Subject            | Publisher          | Consumer(s)
+  -------------------|--------------------|----------------------------------
+  billing.opd        | Clinical Service   | Finance Service
+  billing.wound      | Clinical Service   | Finance Service
+  billing.ward       | Ward Service       | Finance Service
+  billing.lab        | Lab Service        | Finance Service
+  lab.requested      | Clinical Service   | Lab Service
+  queue.updated      | Reception Service  | WebSocket Bridge
+  pharmacy.new_rx    | Clinical Service   | WebSocket Bridge
+
+Event Payload Schemas (replace the incorrect payloads in the old doc):
+
+  billing.opd — published when an OPD session is completed:
+    {
+      "sessionId":    "uuid",
+      "patientId":    "uuid",
+      "patientName":  "string",
+      "doctorName":   "string",
+      "sessionDate":  "ISO-8601 datetime",
+      "consultationFee": number,
+      "items": [
+        { "itemName": "string", "itemType": "string",
+          "quantity": number, "unitPrice": number }
+      ]
+    }
+
+  billing.wound — published when a wound care session is completed:
+    {
+      "sessionId":   "uuid",
+      "patientId":   "uuid",
+      "patientName": "string",
+      "nurseId":     "uuid",
+      "nurseName":   "string",
+      "sessionDate": "ISO-8601 datetime",
+      "items": [
+        { "itemName": "string", "itemType": "string",
+          "quantity": number, "unitPrice": number }
+      ]
+    }
+
+  billing.ward — published on patient discharge (Ward Service):
+    {
+      "admissionId":  "uuid",
+      "patientId":    "uuid",
+      "patientName":  "string",
+      "services": [
+        { "serviceId": "uuid", "serviceName": "string",
+          "quantity": number, "unitPrice": number, "totalPrice": number }
+      ],
+      "totalAmount":  number,
+      "dischargedAt": "ISO-8601 datetime (LocalDateTime)"
+    }
+
+  billing.lab — published when a lab order is marked paid (Lab Service):
+    {
+      "orderId":       "uuid",
+      "patientId":     "uuid",
+      "patientName":   "string",
+      "tests": [
+        { "testId": "uuid", "testName": "string",
+          "unitPrice": number }
+      ],
+      "totalAmount":   number,
+      "paymentMethod": "string",
+      "paidAt":        "ISO-8601 datetime (ZonedDateTime)"
+    }
+
+  lab.requested — published when a doctor requests lab tests (Clinical Service):
+    {
+      "sessionId":   "uuid",
+      "patientId":   "uuid",
+      "patientName": "string",
+      "doctorId":    "uuid",
+      "doctorName":  "string",
+      "tests": [
+        { "testId": "uuid", "testName": "string" }
+      ],
+      "requestedAt": "ISO-8601 datetime"
+    }
+
+  queue.updated — published when the patient queue changes (Reception Service):
+    {
+      "queueDate":  "YYYY-MM-DD",
+      "totalCount": number,
+      "waiting":    number,
+      "called":     number,
+      "queue": [
+        { "tokenNumber": number, "patientName": "string",
+          "status": "waiting|called|completed", "doctorName": "string" }
+      ]
+    }
+
+  pharmacy.new_rx — published when a session with prescriptions is completed:
+    {
+      "sessionId":   "uuid",
+      "patientId":   "uuid",
+      "patientName": "string",
+      "doctorName":  "string",
+      "completedAt": "ISO-8601 datetime",
+      "prescriptions": [
+        { "id": "uuid", "medicineName": "string", "dosage": "string",
+          "frequency": "string", "durationDays": number, "instructions": "string" }
+      ]
+    }
+
+────────────────────────────────────────────────────────────────────────────────
+PART 5 — SERVICE API SECTIONS
+────────────────────────────────────────────────────────────────────────────────
+
+For each of the 6 microservices, create a full section using the attached YAML
+file as the authoritative source. Keep the same format as the existing Reception
+and Clinical sections (subsection per tag, endpoint tables, request/response
+body examples). The sections to produce are:
+
+5.1 Reception Service :3001  (01_reception_service.yaml)
+    — The existing PDF section appears largely correct. Verify against YAML and
+      update any discrepancies. Keep the existing format.
+
+5.2 Clinical Service :3002  (02_clinical_service.yaml)
+    — The existing PDF section appears largely correct. Verify and update.
+
+5.3 Staff Service :3003  (03_staff_service.yaml)  ← MISSING FROM PDF, add fully
+    Tags/Groups to document:
+      Doctors     — CRUD + file upload (avatar + banner), Keycloak auto-provisioned
+      Departments — CRUD
+      Schedules   — Create/update schedule slots per doctor
+      Availability — Query doctor available time slots
+      Nurse Allocations — Assign nurse to doctor+date, mark complete
+      Staff (non-doctor) — List non-doctor staff available by role/date
+
+    Key notes to include:
+      - POST /doctors: multipart/form-data (fields + avatar + banner files)
+      - Creating a doctor auto-creates a Keycloak account with the `doctor` role
+      - Deleting a doctor disables the Keycloak account (soft-delete)
+      - MinIO buckets used: hms-avatars (avatars), hms-doctor-banners (banners)
+      - Schema: staff (separate PostgreSQL schema)
+      - Entities: Doctor, Department, Schedule, NurseAllocation, StaffMember
+
+5.4 Finance Service :3004  (04_finance_service.yaml)  ← MISSING, add fully
+    Tags/Groups to document:
+      Invoices — list, get, create manually, update payment status, print
+      Reports  — daily earnings, department stats
+    Key notes:
+      - Invoices auto-created from NATS events (billing.opd/wound/ward/lab)
+      - Invoice number format: INV-YYYY-NNNNN (e.g. INV-2026-00001)
+      - session_reference_id used for idempotency (prevents duplicate invoices)
+      - MinIO bucket: hms-prescriptions (prescription PDF storage)
+      - Schema: finance (separate PostgreSQL schema)
+
+5.5 Lab Service :3005  (05_lab_service.yaml)  ← MISSING, add fully
+    Tags/Groups to document:
+      Tests   — lab test catalog (CRUD, activate/deactivate)
+      Orders  — create, list, get, enter results, upload report PDF, mark paid
+      History — patient lab history
+    Key notes:
+      - Orders created two ways: walk_in (POST /orders) or clinical_request (NATS lab.requested)
+      - Order status flow: registered → processing → completed (auto when all tests done)
+      - PUT /orders/:id/results → enter test results
+      - POST /orders/:id/report → upload PDF to MinIO, returns presigned URL (15-min expiry)
+      - PUT /orders/:id/pay → sets paymentStatus=paid, publishes billing.lab event
+      - MinIO bucket: hms-lab-reports
+      - Schema: lab (separate PostgreSQL schema)
+
+5.6 Ward Service :3006  (06_ward_service.yaml)  ← MISSING, add fully
+    Tags/Groups to document:
+      Wards      — CRUD, bed availability summary
+      Admissions — admit patient, list, get, discharge
+      Services   — stack service charges during admission, delete before discharge
+    Key notes:
+      - Beds auto-generated on ward creation (prefix = first letter of ward name, numbered 101+)
+      - Bed status: available → occupied (on admit) → available (on discharge)
+      - Service charges stack during admission; DELETE only allowed before discharge
+      - PUT /admissions/:id/discharge → publishes billing.ward event → Finance auto-invoices
+      - No MinIO; no incoming NATS events
+      - Schema: ward (separate PostgreSQL schema)
+
+────────────────────────────────────────────────────────────────────────────────
+PART 6 — API GATEWAY :3000  (new section — add after global conventions)
+────────────────────────────────────────────────────────────────────────────────
+
+Add a full "API Gateway" section. Source: 00_gateway.yaml. Cover:
+
+6.1 Overview
+    - Spring Cloud Gateway, Java 21, port 3000
+    - Filter chain: RateLimitFilter (first) → JwtAuthenticationFilter (second) → Route proxy
+    - Rate limiting: 100 requests/minute per IP (stored in Redis)
+    - JWT validation: NimbusReactiveJwtDecoder using Keycloak JWKS (RS256)
+    - No shared secret — purely asymmetric key validation
+
+6.2 Request Headers Injected by Gateway (table)
+    Header         | Source in JWT          | Example value
+    ---------------|------------------------|----------------------------
+    X-User-Id      | jwt.sub (UUID)         | 550e8400-e29b-41d4-a716-...
+    X-User-Role    | realm_access.roles[]   | admin
+    X-User-Name    | name (→ preferred_username fallback) | System Admin
+
+6.3 RBAC Route Rules
+    - Rules stored in Redis, loaded into memory on startup
+    - Each rule: { pattern, allowedRoles[], requiresAuth }
+    - Pattern uses Ant-style matching (e.g. /patients/**, /lab/orders/**)
+    - Can be hot-reloaded via POST /admin/routes/reload
+    - Default rules match the existing access control matrix below
+
+6.4 Route Access Control Matrix (table showing which roles can access which paths)
+    Path Pattern         | Allowed Roles
+    ---------------------|--------------------------------------------------
+    /health              | (no auth required)
+    /patients/**         | admin, doctor, nurse, receptionist
+    /appointments/**     | admin, doctor, nurse, receptionist
+    /tokens/**           | admin, receptionist, nurse, doctor
+    /sessions/**         | admin, doctor, nurse
+    /clinical/**         | admin, doctor, nurse
+    /pharmacy/**         | admin, doctor, nurse, receptionist
+    /staff/**            | admin
+    /doctors/**          | admin, doctor, nurse, receptionist
+    /departments/**      | admin, doctor, nurse
+    /schedules/**        | admin, doctor
+    /nurse-allocations/**| admin, nurse, doctor
+    /finance/**          | admin, receptionist
+    /invoices/**         | admin, receptionist
+    /lab/**              | admin, lab_tech, doctor, nurse
+    /ward/**             | admin, nurse, ward_staff, doctor
+    /ws/**               | (no auth — Socket.IO handshake)
+    /admin/**            | admin (also requires X-Admin-Key header)
+
+6.5 Admin RBAC API Endpoints
+    Document all endpoints from 00_gateway.yaml:
+    - GET    /admin/routes          — list all current RBAC rules
+    - POST   /admin/routes          — add a new rule (with optional position index)
+    - PUT    /admin/routes/{index}  — update rule at position
+    - DELETE /admin/routes/{index}  — delete rule at position
+    - POST   /admin/routes/reset    — restore default built-in rules
+    - POST   /admin/routes/reload   — reload rules from Redis into memory
+
+    Authentication for /admin/* endpoints: standard JWT (admin role) PLUS
+    header:  X-Admin-Key: admin-secret-key
+
+    Include request/response body examples from the YAML.
+
+6.6 Health Endpoint
+    GET /health → 200 { "status": "UP", "service": "hms-gateway", "timestamp": "..." }
+    No authentication required.
+
+────────────────────────────────────────────────────────────────────────────────
+PART 7 — WEBSOCKET BRIDGE :3010  (new section — add at end)
+────────────────────────────────────────────────────────────────────────────────
+
+Add a "WebSocket Bridge" section covering:
+
+7.1 Overview
+    - Node.js 22 + Socket.IO server
+    - Separate process from the API Gateway, port 3010
+    - Sole responsibility: subscribe to NATS JetStream subjects and push events
+      to connected browser clients via Socket.IO rooms
+    - No REST endpoints; no authentication (Socket.IO clients connect freely)
+    - No direct connection to PostgreSQL or MinIO
+
+7.2 Connection
+    Browser connects to:   ws://localhost:3010
+    With query parameter:  ?room=queue   or   ?room=pharmacy
+
+    Socket.IO client example:
+      const socket = io('http://localhost:3010', { query: { room: 'queue' } });
+      socket.on('queue:updated', (data) => { /* update UI */ });
+
+7.3 Rooms and Events (table)
+    Room      | Socket.IO Event   | Triggered by NATS subject | Payload
+    ----------|-------------------|---------------------------|--------
+    queue     | queue:updated     | queue.updated             | Queue snapshot (see NATS section)
+    pharmacy  | pharmacy:new_rx   | pharmacy.new_rx           | New prescription event (see NATS section)
+
+7.4 NATS Consumer Details
+    Subject            | Durable name        | Action on message
+    -------------------|---------------------|--------------------------------
+    queue.updated      | ws-bridge-queue     | Emit queue:updated to room queue
+    pharmacy.new_rx    | ws-bridge-pharmacy  | Emit pharmacy:new_rx to room pharmacy
+
+    Messages are acknowledged after emit (WorkQueue — auto-deleted after ack).
+
+────────────────────────────────────────────────────────────────────────────────
+PART 8 — DOCUMENT STRUCTURE / TABLE OF CONTENTS
+────────────────────────────────────────────────────────────────────────────────
+
+The updated PDF should have this structure (order of sections):
+
+  1. Cover Page
+  2. Table of Contents
+  3. Architecture Overview
+       3.1 System Components
+       3.2 Architecture Diagram
+       3.3 Data Flow Summary
+  4. Global Conventions
+       4.1 Service Ports
+       4.2 Authentication & Authorization
+       4.3 Standard Response Format
+       4.4 HTTP Status Codes
+       4.5 File Upload (MinIO)
+       4.6 Pagination
+  5. API Gateway :3000
+       5.1 Filter Chain
+       5.2 Injected Headers
+       5.3 RBAC Route Rules
+       5.4 Access Control Matrix
+       5.5 Admin RBAC Endpoints
+       5.6 Health Endpoint
+  6. NATS JetStream Messaging
+       6.1 Stream Configuration
+       6.2 Event Subject Reference
+       6.3 Event Payload Schemas
+  7. Reception Service :3001
+  8. Clinical Service :3002
+  9. Staff Service :3003        ← NEW
+  10. Finance Service :3004     ← NEW
+  11. Lab Service :3005         ← NEW
+  12. Ward Service :3006        ← NEW
+  13. WebSocket Bridge :3010    ← NEW
+
+────────────────────────────────────────────────────────────────────────────────
+PART 9 — FORMATTING GUIDELINES
+────────────────────────────────────────────────────────────────────────────────
+
+- Maintain the same professional look as the existing PDF (clean sans-serif font,
+  coloured section headers, tables with borders, code blocks with monospace font)
+- Endpoints: use method+path in bold as heading, then a table with columns:
+    Auth Required | Roles Allowed | Description
+- Request/response bodies: JSON code blocks with inline comments
+- Where the YAML shows multiple schemas, document the most important ones
+  (skip internal-only or trivially simple schemas if page count is a concern)
+- Keep service sections concise but complete — every endpoint should appear
+- Version in header/footer: v2.0, March 2026
+- Page numbers in footer
+
+────────────────────────────────────────────────────────────────────────────────
+PART 10 — THINGS TO REMOVE FROM THE EXISTING PDF
+────────────────────────────────────────────────────────────────────────────────
+
+Remove or overwrite these specific pieces of incorrect information:
+
+  1. Any mention of "auth-service" or a custom authentication microservice —
+     it does not exist. Keycloak is the sole auth server.
+
+  2. client_id: hms-app — WRONG. The correct client ID is: hms-client
+     (It is a public client; there is NO client_secret.)
+
+  3. Token TTL of 900 seconds — WRONG. Actual accessTokenLifespan is 300 seconds
+     (5 minutes).
+
+  4. Single NATS stream "HMS_EVENTS" — WRONG. There are 4 separate streams:
+     BILLING, LAB, QUEUE, PHARMACY.
+
+  5. "WebSocket Bridge (Socket.IO)" shown inside or embedded in the API Gateway
+     box — WRONG. The WebSocket Bridge is a completely separate Node.js process
+     on port 3010.
+
+  6. "WS push" arrow from Ward Service to API Gateway — WRONG. Ward Service only
+     publishes to NATS (billing.ward). The ws-bridge (port 3010) is the Socket.IO
+     server.
+
+  7. Missing Redis from the architecture — Redis (port 6379) is a real component
+     used by the gateway for rate limiting and RBAC rule storage.
+
+  8. billing.ward payload showing ward_name/bed_number as direct fields — the
+     actual payload structure groups charges under services[] array and includes
+     dischargedAt timestamp (LocalDateTime). See Part 4 above for correct payload.
+
+  9. The subscriber for queue.updated and pharmacy.new_rx shown as "API Gateway"
+     — the actual consumer is the ws-bridge (separate Node.js process).
+
+================================================================================
+END OF PROMPT
+================================================================================
