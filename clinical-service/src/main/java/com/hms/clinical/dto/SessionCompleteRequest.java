@@ -15,6 +15,8 @@ public class SessionCompleteRequest {
     @NotBlank(message = "diagnosis is required")
     private String diagnosis;
 
+    private Double consultationFee;
+
     private Double discountPercent;
 
     private String discountReason;

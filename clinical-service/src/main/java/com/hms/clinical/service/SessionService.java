@@ -133,6 +133,7 @@ public class SessionService {
                 .sessionType(saved.getSessionType())
                 .doctorId(saved.getDoctorId())
                 .doctorName(saved.getDoctorName())
+                .consultationFee(request.getConsultationFee())
                 .discountPercent(saved.getDiscountPercent())
                 .discountReason(saved.getDiscountReason())
                 .completedAt(saved.getCompletedAt())

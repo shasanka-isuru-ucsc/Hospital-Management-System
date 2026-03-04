@@ -19,6 +19,7 @@ public class BillingEvent {
     private String sessionType;
     private UUID doctorId;
     private String doctorName;
+    private Double consultationFee;
     private Double discountPercent;
     private String discountReason;
     private LocalDateTime completedAt;
